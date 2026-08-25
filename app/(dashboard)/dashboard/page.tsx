@@ -1,6 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Users, BookOpen, Clock } from "lucide-react";
+import { School } from "lucide-react";
 import { getDashboardStats } from "@/lib/db/queries";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardStats } from "@/components/dashboard-stats";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = {
   title: "Dashboard | KVSR Management",
@@ -12,96 +14,86 @@ export default async function DashboardPage() {
   const stats = await getDashboardStats();
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-kvsr-navy">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Welcome to KVSR Management System
-        </p>
-      </div>
+    <div className="p-6 sm:p-8">
+      <DashboardHeader
+        title="Dashboard"
+        subtitle="Welcome to KVSR Management System"
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Students
-            </CardTitle>
-            <Users className="h-4 w-4 text-kvsr-orange" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">{stats.students}</div>
-            <p className="text-xs text-muted-foreground">Across all years</p>
-          </CardContent>
-        </Card>
+      <DashboardStats
+        students={stats.students}
+        faculty={stats.faculty}
+        slots={stats.slots}
+        periods={stats.periods}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Faculty
-            </CardTitle>
-            <BookOpen className="h-4 w-4 text-kvsr-orange" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">{stats.faculty}</div>
-            <p className="text-xs text-muted-foreground">Including HOD</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="border-none shadow-lg h-full">
+            <CardHeader>
+              <CardTitle className="text-kvsr-navy flex items-center gap-2">
+                <School className="w-5 h-5 text-kvsr-orange" />
+                Department Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground leading-relaxed">
+                Currently managing the Computer Science and Engineering (CSE)
+                department. The system is architected to scale across multiple
+                departments, programs, and academic years as the institution
+                grows.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-kvsr-navy/5">
+                  <div className="text-2xl font-bold text-kvsr-navy">CSE</div>
+                  <div className="text-sm text-muted-foreground">
+                    Active Department
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl bg-kvsr-navy/5">
+                  <div className="text-2xl font-bold text-kvsr-navy">
+                    2026-27
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Academic Year
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Timetable Slots
-            </CardTitle>
-            <Calendar className="h-4 w-4 text-kvsr-orange" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">{stats.slots}</div>
-            <p className="text-xs text-muted-foreground">Weekly slots</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Periods/Day
-            </CardTitle>
-            <Clock className="h-4 w-4 text-kvsr-orange" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">{stats.periods}</div>
-            <p className="text-xs text-muted-foreground">09:50 AM - 05:00 PM</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-kvsr-navy">Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Use the sidebar to navigate between modules.
-            </p>
-            <ul className="text-sm space-y-1 text-muted-foreground list-disc list-inside">
-              <li>View and manage timetable</li>
-              <li>Track attendance</li>
-              <li>Manage students and faculty</li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-kvsr-navy">Department</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Currently managing CSE department data. The system is built to
-              scale to multiple departments when ready.
-            </p>
-          </CardContent>
-        </Card>
+        <div>
+          <Card className="border-none shadow-lg h-full">
+            <CardHeader>
+              <CardTitle className="text-kvsr-navy">Quick Links</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {[
+                  { label: "View Timetable", href: "/timetable" },
+                  { label: "Track Attendance", href: "#" },
+                  { label: "Manage Students", href: "#" },
+                  { label: "Faculty Directory", href: "#" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-kvsr-navy/5 transition-colors group"
+                    >
+                      <span className="text-sm font-medium text-muted-foreground group-hover:text-kvsr-navy">
+                        {link.label}
+                      </span>
+                      <span className="text-kvsr-orange opacity-0 group-hover:opacity-100 transition-opacity">
+                        →
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
