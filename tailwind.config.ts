@@ -1,0 +1,91 @@
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: "var(--card)",
+        "card-foreground": "var(--card-foreground)",
+        popover: "var(--popover)",
+        "popover-foreground": "var(--popover-foreground)",
+        primary: "var(--primary)",
+        "primary-foreground": "var(--primary-foreground)",
+        secondary: "var(--secondary)",
+        "secondary-foreground": "var(--secondary-foreground)",
+        muted: "var(--muted)",
+        "muted-foreground": "var(--muted-foreground)",
+        accent: "var(--accent)",
+        "accent-foreground": "var(--accent-foreground)",
+        destructive: "var(--destructive)",
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        "kvsr-navy": {
+          DEFAULT: "#021B43",
+          50: "#E6F0FF",
+          100: "#CCE0FF",
+          200: "#99C2FF",
+          300: "#66A3FF",
+          400: "#3385FF",
+          500: "#021B43",
+          600: "#011536",
+          700: "#01102A",
+          800: "#000A1D",
+          900: "#000511",
+        },
+        "kvsr-orange": {
+          DEFAULT: "#D47314",
+          50: "#FDF4E8",
+          100: "#FAE9D1",
+          200: "#F5D3A3",
+          300: "#F0BD75",
+          400: "#EBA747",
+          500: "#D47314",
+          600: "#AA5C10",
+          700: "#80450C",
+          800: "#552E08",
+          900: "#2B1704",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      animation: {
+        "fade-in": "fadeIn 0.8s ease-out forwards",
+        "scale-in": "scaleIn 0.6s ease-out forwards",
+        "slide-up": "slideUp 0.7s ease-out forwards",
+        "pulse-soft": "pulseSoft 2s ease-in-out infinite",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        scaleIn: {
+          "0%": { opacity: "0", transform: "scale(0.8)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        slideUp: {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        pulseSoft: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+export default config;
