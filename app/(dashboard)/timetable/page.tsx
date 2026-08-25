@@ -27,25 +27,27 @@ export default async function TimetablePage({
 
   return (
     <div className="p-6 sm:p-8">
-      <DashboardHeader
-        title="Timetable"
-        subtitle="View and manage class schedules"
-      />
-
-      {sections.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-border p-12 text-center shadow-sm">
-          <p className="text-muted-foreground">
-            No sections found. Please run the database migration first.
-          </p>
-        </div>
-      ) : (
-        <TimetableGrid
-          slots={slots}
-          sectionName={sectionName}
-          sections={sections}
-          selectedSectionId={selectedSectionId}
+      <div className="max-w-7xl mx-auto">
+        <DashboardHeader
+          title="Timetable"
+          subtitle="View and manage class schedules"
         />
-      )}
+
+        {sections.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-border p-12 text-center shadow-sm">
+            <p className="text-muted-foreground">
+              No sections found. Please run the database migration first.
+            </p>
+          </div>
+        ) : (
+          <TimetableGrid
+            slots={slots}
+            sectionName={sectionName}
+            sections={sections}
+            selectedSectionId={selectedSectionId}
+          />
+        )}
+      </div>
     </div>
   );
 }

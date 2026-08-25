@@ -54,6 +54,13 @@ const config: Config = {
           800: "#552E08",
           900: "#2B1704",
         },
+        "kvsr-deep": "#07152E",
+        "kvsr-ink": "#021B43",
+        "kvsr-cta": "#A6530F",
+        "kvsr-gold": "#E7A23B",
+        "kvsr-paper": "#F7F7F4",
+        "kvsr-soft": "#E6EAF0",
+        "kvsr-muted": "#AAB6C6",
       },
       borderRadius: {
         lg: "var(--radius)",

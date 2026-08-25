@@ -49,7 +49,7 @@ export function Sidebar() {
             />
           </div>
           <div>
-            <h2 className="font-bold text-base leading-tight">KVSR</h2>
+            <h2 className="font-bold text-base leading-tight">KVSRIT</h2>
             <p className="text-[10px] text-white/70">Management</p>
           </div>
         </Link>
@@ -94,7 +94,7 @@ export function Sidebar() {
               />
             </div>
             <div>
-              <h2 className="font-bold text-lg leading-tight">KVSR</h2>
+              <h2 className="font-bold text-lg leading-tight">KVSRIT</h2>
               <p className="text-xs text-white/70">Management</p>
             </div>
           </Link>

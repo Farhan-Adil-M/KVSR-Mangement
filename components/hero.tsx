@@ -1,17 +1,30 @@
 "use client";
 
-import { motion, useScroll, useTransform } from "motion/react";
-import { useRouter } from "next/navigation";
-import { useRef } from "react";
+import { motion } from "motion/react";
+import Link from "next/link";
+import { ArrowRight, Calendar, Users, BookOpen } from "lucide-react";
 import { LogoAnimation } from "./logo-animation";
-import { ArrowRight, Calendar, Users, BookOpen, Shield } from "lucide-react";
-import Image from "next/image";
+import { DashboardPreview } from "./dashboard-preview";
 
 const features = [
-  { icon: Calendar, label: "Smart Timetable", desc: "Section-wise schedules" },
-  { icon: Users, label: "Attendance", desc: "Track every session" },
-  { icon: BookOpen, label: "Faculty", desc: "Manage teaching staff" },
-  { icon: Shield, label: "Academic Records", desc: "Organized & secure" },
+  {
+    icon: Calendar,
+    title: "Timetables",
+    description: "Section-wise schedules with faculty and room assignments.",
+    featured: false,
+  },
+  {
+    icon: Users,
+    title: "Attendance",
+    description: "Track sessions, view summaries, and identify patterns.",
+    featured: true,
+  },
+  {
+    icon: BookOpen,
+    title: "Academic Operations",
+    description: "Students, faculty, and records in one organized system.",
+    featured: false,
+  },
 ];
 
 const stats = [
@@ -21,233 +34,224 @@ const stats = [
 ];
 
 export function Hero() {
-  const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end start"],
-  });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-
   return (
-    <div ref={containerRef} className="relative min-h-screen overflow-hidden bg-kvsr-navy">
-      {/* Animated gradient mesh background */}
+    <div className="relative min-h-screen overflow-hidden bg-kvsr-deep">
+      {/* Simplified background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-kvsr-orange/20 via-kvsr-navy to-kvsr-navy" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent" />
-        
-        {/* Floating orbs */}
-        <motion.div
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-kvsr-orange/10 blur-3xl"
-        />
-        <motion.div
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 80, 0],
-            scale: [1, 1.3, 1],
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 5 }}
-          className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-3xl"
-        />
+        <div className="absolute top-0 right-0 w-[70vw] h-[70vw] rounded-full bg-kvsr-cta/10 blur-[120px] -translate-y-1/3 translate-x-1/4" />
+        <div className="absolute bottom-0 left-0 w-[40vw] h-[40vw] rounded-full bg-kvsr-navy/40 blur-[100px] translate-y-1/3 -translate-x-1/4" />
       </div>
 
-      {/* Grid pattern overlay */}
+      {/* Subtle grid */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0 opacity-[0.025]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: "60px 60px",
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px)`,
+          backgroundSize: "72px 72px",
         }}
       />
 
-      <motion.div style={{ y, opacity }} className="relative z-10">
-        {/* Navigation bar */}
-        <motion.nav
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="fixed top-0 left-0 right-0 z-50 px-6 py-4"
-        >
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-kvsr-orange/50">
-                <Image
-                  src="/College_logo.jpg"
-                  alt="KVSRIT"
-                  width={40}
-                  height={40}
-                  className="object-contain"
-                />
-              </div>
-              <span className="font-bold text-white text-lg">KVSR Management</span>
+      {/* Navigation */}
+      <motion.nav
+        initial={{ y: -12, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="relative z-20 px-4 sm:px-6 py-4"
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9">
+              <LogoAnimation size={36} variant="nav" />
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.push("/dashboard")}
-              className="px-5 py-2 bg-kvsr-orange text-white text-sm font-medium rounded-full hover:bg-kvsr-orange/90 transition-colors flex items-center gap-2"
-            >
-              Enter Dashboard
-              <ArrowRight size={16} />
-            </motion.button>
-          </div>
-        </motion.nav>
+            <span className="font-semibold text-white text-base sm:text-lg tracking-tight">
+              KVSRIT
+            </span>
+          </Link>
+          <Link
+            href="/dashboard"
+            className="px-4 sm:px-5 py-2 bg-kvsr-cta text-white text-sm font-medium rounded-full hover:bg-kvsr-cta/90 transition-colors flex items-center gap-2 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-kvsr-gold focus:ring-offset-2 focus:ring-offset-kvsr-deep"
+          >
+            <span className="hidden sm:inline">Open Dashboard</span>
+            <span className="sm:hidden">Dashboard</span>
+            <ArrowRight size={15} className="hidden sm:block" />
+          </Link>
+        </div>
+      </motion.nav>
 
-        {/* Hero content */}
-        <div className="min-h-screen flex flex-col items-center justify-center px-4 pt-20">
-          <div className="max-w-5xl mx-auto text-center">
+      {/* Hero content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-20">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center min-h-[calc(100vh-140px)]">
+          {/* Left: copy */}
+          <div className="order-2 lg:order-1">
             <motion.div
-              initial={{ opacity: 0, y: 40 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              className="mb-8"
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6"
             >
-              <LogoAnimation size={160} />
+              <span className="w-1.5 h-1.5 rounded-full bg-kvsr-gold" />
+              <span className="text-xs font-medium text-kvsr-muted tracking-wide uppercase">
+                KVSR Management
+              </span>
             </motion.div>
 
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: { transition: { staggerChildren: 0.08, delayChildren: 0.3 } },
-              }}
-              className="space-y-4"
-            >
-              <div className="overflow-hidden">
-                <motion.h1
-                  variants={{
-                    hidden: { y: 80, opacity: 0 },
-                    visible: { y: 0, opacity: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
-                  }}
-                  className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white tracking-tight"
-                >
-                  KVSR{" "}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-kvsr-orange to-amber-400">
-                    Management
-                  </span>
-                </motion.h1>
-              </div>
-
-              <motion.p
-                variants={{
-                  hidden: { y: 30, opacity: 0 },
-                  visible: { y: 0, opacity: 1, transition: { duration: 0.7 } },
-                }}
-                className="text-xl sm:text-2xl text-white/80 max-w-2xl mx-auto font-light"
+            <div className="overflow-hidden mb-5">
+              <motion.h1
+                initial={{ y: 80, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
+                className="text-4xl sm:text-5xl lg:text-6xl xl:text-[72px] font-semibold text-white leading-[1.1] tracking-tight"
               >
-                Dr. K.V. Subba Reddy Institute of Technology
-              </motion.p>
+                One clear view of{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-kvsr-gold to-kvsr-orange">
+                  campus operations
+                </span>
+                .
+              </motion.h1>
+            </div>
 
-              <motion.p
-                variants={{
-                  hidden: { y: 20, opacity: 0 },
-                  visible: { y: 0, opacity: 1, transition: { duration: 0.6 } },
-                }}
-                className="text-sm sm:text-base text-kvsr-orange font-medium tracking-[0.2em] uppercase"
-              >
-                Kurnool, Andhra Pradesh
-              </motion.p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.9 }}
-              className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+              transition={{ duration: 0.6, delay: 0.45 }}
+              className="text-base sm:text-lg text-kvsr-muted leading-relaxed max-w-xl mb-8"
             >
-              <motion.button
-                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px -10px rgba(212, 115, 20, 0.5)" }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => router.push("/dashboard")}
-                className="group px-8 py-4 bg-gradient-to-r from-kvsr-orange to-amber-500 text-white text-lg font-semibold rounded-full shadow-xl shadow-kvsr-orange/20 flex items-center gap-3"
+              Timetables, attendance, faculty, and academic records—organized
+              for the people who keep KVSRIT moving.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-10"
+            >
+              <Link
+                href="/dashboard"
+                className="group px-6 py-3 bg-kvsr-cta text-white font-semibold rounded-full hover:bg-kvsr-cta/90 transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-kvsr-gold focus:ring-offset-2 focus:ring-offset-kvsr-deep"
               >
-                Launch Dashboard
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => router.push("/timetable")}
-                className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white text-lg font-medium rounded-full border border-white/20 hover:bg-white/20 transition-colors"
+                Open Dashboard
+                <ArrowRight
+                  size={17}
+                  className="group-hover:translate-x-0.5 transition-transform"
+                />
+              </Link>
+              <Link
+                href="/timetable"
+                className="px-6 py-3 text-white/80 font-medium hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-kvsr-gold/50 rounded-full"
               >
-                View Timetable
-              </motion.button>
+                View Timetable →
+              </Link>
             </motion.div>
 
             {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 1.1 }}
-              className="mt-16 grid grid-cols-3 gap-8 max-w-lg mx-auto"
+              transition={{ duration: 0.6, delay: 0.65 }}
+              className="flex items-center gap-8 sm:gap-10"
             >
               {stats.map((stat, index) => (
-                <div key={stat.label} className="text-center">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, delay: 1.3 + index * 0.1 }}
-                    className="text-3xl sm:text-4xl font-bold text-white"
-                  >
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.75 + index * 0.08 }}
+                >
+                  <div className="text-2xl sm:text-3xl font-bold text-white">
                     {stat.value}
-                  </motion.div>
-                  <div className="text-xs sm:text-sm text-white/60 mt-1">{stat.label}</div>
-                </div>
+                  </div>
+                  <div className="text-xs text-kvsr-muted mt-0.5">
+                    {stat.label}
+                  </div>
+                </motion.div>
               ))}
             </motion.div>
           </div>
 
-          {/* Feature cards */}
-          <motion.div
-            initial={{ opacity: 0, y: 60 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1.4 }}
-            className="w-full max-w-6xl mx-auto mt-24 px-4 pb-16"
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
-                return (
-                  <motion.div
-                    key={feature.label}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 1.5 + index * 0.1 }}
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                    className="group p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-kvsr-orange/30 transition-all"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-kvsr-orange/20 flex items-center justify-center mb-4 group-hover:bg-kvsr-orange/30 transition-colors">
-                      <Icon className="w-6 h-6 text-kvsr-orange" />
-                    </div>
-                    <h3 className="text-white font-semibold mb-1">{feature.label}</h3>
-                    <p className="text-white/60 text-sm">{feature.desc}</p>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-
-          {/* Footer */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.8, duration: 0.8 }}
-            className="pb-8 text-center"
-          >
-            <p className="text-xs text-white/40">
-              NAAC A+ Accredited | JNTUA Affiliated | AICTE Approved
-            </p>
-          </motion.div>
+          {/* Right: product preview */}
+          <div className="order-1 lg:order-2 flex justify-center lg:justify-end">
+            <DashboardPreview />
+          </div>
         </div>
-      </motion.div>
+
+        {/* Feature cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.85 }}
+          className="mt-16 lg:mt-8"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.95 + index * 0.1 }}
+                  whileHover={{ y: -4 }}
+                  className={`relative p-6 rounded-2xl border border-white/10 transition-all duration-300 group focus-within:ring-2 focus-within:ring-kvsr-gold/50 ${
+                    feature.featured
+                      ? "bg-gradient-to-br from-kvsr-cta/20 to-kvsr-cta/5 md:scale-105 md:-my-2"
+                      : "bg-white/5 hover:bg-white/[0.07]"
+                  }`}
+                >
+                  {feature.featured && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full bg-kvsr-gold text-kvsr-deep text-[10px] font-bold uppercase tracking-wide">
+                      Core
+                    </div>
+                  )}
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
+                      feature.featured
+                        ? "bg-kvsr-gold/20"
+                        : "bg-white/10 group-hover:bg-kvsr-gold/10"
+                    } transition-colors`}
+                  >
+                    <Icon
+                      className={`w-5 h-5 ${
+                        feature.featured ? "text-kvsr-gold" : "text-white/80"
+                      }`}
+                    />
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-1.5">
+                    {feature.title}
+                    {feature.featured && (
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-kvsr-gold ml-2 align-middle" />
+                    )}
+                  </h3>
+                  <p className="text-kvsr-muted text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Trust bar */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.6 }}
+          className="mt-16 pt-8 border-t border-white/10"
+        >
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-center">
+            <span className="text-xs text-kvsr-muted uppercase tracking-wider">
+              Trusted by KVSRIT
+            </span>
+            <div className="flex items-center gap-6 text-xs text-white/50">
+              <span>NAAC A+ Accredited</span>
+              <span className="w-1 h-1 rounded-full bg-white/30" />
+              <span>JNTUA Affiliated</span>
+              <span className="w-1 h-1 rounded-full bg-white/30" />
+              <span>AICTE Approved</span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
