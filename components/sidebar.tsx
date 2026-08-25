@@ -22,7 +22,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/timetable", label: "Timetable", icon: Calendar },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { href: "#", label: "Students", icon: Users, disabled: true },
+  { href: "/students", label: "Students", icon: Users },
   { href: "#", label: "Faculty", icon: BookOpen, disabled: true },
   { href: "#", label: "Settings", icon: Settings, disabled: true },
 ];

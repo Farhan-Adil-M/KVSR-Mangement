@@ -11,6 +11,7 @@ import {
   studentEnrollments,
   attendanceSessions,
   attendanceRecords,
+  studentAttendanceSummaries,
 } from "./schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 
@@ -221,4 +222,72 @@ export async function getAttendanceRecordsForSession(sessionId: string) {
     })
     .from(attendanceRecords)
     .where(eq(attendanceRecords.sessionId, sessionId));
+}
+
+export async function getStudentsWithEnrollments(filters?: {
+  sectionId?: string;
+  year?: string;
+  search?: string;
+}) {
+  const currentYear = await getCurrentAcademicYear();
+  if (!currentYear) return [];
+
+  const conditions = [eq(studentEnrollments.academicYearId, currentYear.id)];
+
+  if (filters?.sectionId) {
+    conditions.push(eq(studentEnrollments.sectionId, filters.sectionId));
+  }
+
+  const query = db
+    .select({
+      id: students.id,
+      rollNumber: students.rollNumber,
+      fullName: students.fullName,
+      email: students.email,
+      phone: students.phone,
+      sectionId: sections.id,
+      sectionName: sections.name,
+      year: studyYears.label,
+      yearNumber: studyYears.yearNumber,
+    })
+    .from(studentEnrollments)
+    .innerJoin(students, eq(studentEnrollments.studentId, students.id))
+    .innerJoin(sections, eq(studentEnrollments.sectionId, sections.id))
+    .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
+    .where(and(...conditions))
+    .orderBy(asc(studyYears.yearNumber), asc(sections.name), asc(students.rollNumber));
+
+  const results = await query;
+
+  if (filters?.year && filters.year !== "all") {
+    const filtered = results.filter((r) => r.year === filters.year);
+    return applySearch(filtered, filters.search);
+  }
+
+  return applySearch(results, filters?.search);
+}
+
+function applySearch<T extends { fullName: string | null; rollNumber: string | null }>(
+  items: T[],
+  search?: string
+) {
+  if (!search || search.trim() === "") return items;
+  const term = search.toLowerCase();
+  return items.filter(
+    (item) =>
+      item.fullName?.toLowerCase().includes(term) ||
+      item.rollNumber?.toLowerCase().includes(term)
+  );
+}
+
+export async function getAttendanceSummaryForStudent(studentId: string) {
+  return db
+    .select({
+      subject: subjects.name,
+      classesHeld: studentAttendanceSummaries.classesHeld,
+      classesAttended: studentAttendanceSummaries.classesAttended,
+    })
+    .from(studentAttendanceSummaries)
+    .innerJoin(subjects, eq(studentAttendanceSummaries.subjectId, subjects.id))
+    .where(eq(studentAttendanceSummaries.studentId, studentId));
 }
