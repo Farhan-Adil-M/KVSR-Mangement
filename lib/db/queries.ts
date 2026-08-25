@@ -291,3 +291,34 @@ export async function getAttendanceSummaryForStudent(studentId: string) {
     .innerJoin(subjects, eq(studentAttendanceSummaries.subjectId, subjects.id))
     .where(eq(studentAttendanceSummaries.studentId, studentId));
 }
+
+export async function getAttendanceReportBySection(sectionId: string) {
+  const currentYear = await getCurrentAcademicYear();
+  if (!currentYear) return [];
+
+  return db
+    .select({
+      studentId: students.id,
+      rollNumber: students.rollNumber,
+      fullName: students.fullName,
+      subject: subjects.name,
+      subjectId: subjects.id,
+      classesHeld: studentAttendanceSummaries.classesHeld,
+      classesAttended: studentAttendanceSummaries.classesAttended,
+    })
+    .from(studentAttendanceSummaries)
+    .innerJoin(students, eq(studentAttendanceSummaries.studentId, students.id))
+    .innerJoin(subjects, eq(studentAttendanceSummaries.subjectId, subjects.id))
+    .innerJoin(
+      studentEnrollments,
+      eq(studentEnrollments.studentId, students.id)
+    )
+    .where(
+      and(
+        eq(studentEnrollments.sectionId, sectionId),
+        eq(studentEnrollments.academicYearId, currentYear.id),
+        eq(studentEnrollments.isActive, true)
+      )
+    )
+    .orderBy(asc(students.rollNumber), asc(subjects.name));
+}

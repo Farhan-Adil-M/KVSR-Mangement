@@ -83,6 +83,22 @@ export default async function AttendancePage({
           subtitle="Mark and manage daily attendance"
         />
 
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-6 border-b border-kvsr-soft">
+          <a
+            href="/attendance"
+            className="px-4 py-3 text-sm font-semibold text-kvsr-ink border-b-2 border-kvsr-cta"
+          >
+            Mark Attendance
+          </a>
+          <a
+            href="/attendance/reports"
+            className="px-4 py-3 text-sm font-medium text-muted-foreground hover:text-kvsr-ink transition-colors"
+          >
+            Reports
+          </a>
+        </div>
+
         {sections.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-12 text-center shadow-sm">
             <p className="text-muted-foreground">
