@@ -5,7 +5,7 @@ export const metadata = {
   title: "Timetable | KVSR Management",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function TimetablePage() {
   const sections = await getSections();

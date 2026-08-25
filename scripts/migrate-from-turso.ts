@@ -378,7 +378,16 @@ async function main() {
       ? facultyMap.get(record.edited_by) ?? null
       : facultyId;
 
-    const absentees: string[] = JSON.parse(record.absentee_roll_numbers || "[]");
+    let absentees: string[] = [];
+    try {
+      absentees = JSON.parse(record.absentee_roll_numbers || "[]");
+    } catch (err) {
+      console.error(
+        `Failed to parse absentees for attendance record ${record.id}:`,
+        record.absentee_roll_numbers
+      );
+      absentees = [];
+    }
     const absenteeSet = new Set(absentees);
 
     const [session] = await db

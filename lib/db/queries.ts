@@ -8,7 +8,7 @@ import {
   periods,
   academicYears,
 } from "./schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 
 export type TimetableSlotWithDetails = {
   id: string;
@@ -48,7 +48,18 @@ export async function getTimetableForSection(
     .innerJoin(periods, eq(timetableSlots.periodId, periods.id))
     .leftJoin(faculty, eq(timetableSlots.facultyId, faculty.id))
     .where(eq(timetableSlots.sectionId, sectionId))
-    .orderBy(asc(timetableSlots.dayOfWeek), asc(periods.periodNumber));
+    .orderBy(
+      sql`CASE ${timetableSlots.dayOfWeek}
+        WHEN 'Monday' THEN 1
+        WHEN 'Tuesday' THEN 2
+        WHEN 'Wednesday' THEN 3
+        WHEN 'Thursday' THEN 4
+        WHEN 'Friday' THEN 5
+        WHEN 'Saturday' THEN 6
+        WHEN 'Sunday' THEN 7
+      END`,
+      asc(periods.periodNumber)
+    );
 
   // Calculate lab periods for each lab slot
   const labGroupPeriods = new Map<string, number>();
