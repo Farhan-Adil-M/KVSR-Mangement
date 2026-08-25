@@ -8,8 +8,11 @@ import {
   periods,
   academicYears,
   students,
+  studentEnrollments,
+  attendanceSessions,
+  attendanceRecords,
 } from "./schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 
 export type TimetableSlotWithDetails = {
   id: string;
@@ -131,4 +134,91 @@ export async function getDashboardStats() {
     slots: slotCount?.count ?? 0,
     periods: periodCount?.count ?? 0,
   };
+}
+
+export async function getStudentsBySection(sectionId: string) {
+  const currentYear = await getCurrentAcademicYear();
+  if (!currentYear) return [];
+
+  return db
+    .select({
+      id: students.id,
+      rollNumber: students.rollNumber,
+      fullName: students.fullName,
+      enrollmentId: studentEnrollments.id,
+    })
+    .from(studentEnrollments)
+    .innerJoin(students, eq(studentEnrollments.studentId, students.id))
+    .where(
+      and(
+        eq(studentEnrollments.sectionId, sectionId),
+        eq(studentEnrollments.academicYearId, currentYear.id),
+        eq(studentEnrollments.isActive, true)
+      )
+    )
+    .orderBy(asc(students.rollNumber));
+}
+
+export async function getTimetableSlotsForSectionAndDay(
+  sectionId: string,
+  dayOfWeek: string
+) {
+  const currentYear = await getCurrentAcademicYear();
+  if (!currentYear) return [];
+
+  return db
+    .select({
+      id: timetableSlots.id,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      periodNumber: periods.periodNumber,
+      startTime: periods.startTime,
+      endTime: periods.endTime,
+      subject: subjects.name,
+      subjectId: subjects.id,
+      faculty: faculty.fullName,
+      facultyId: faculty.id,
+      isLab: timetableSlots.isLab,
+    })
+    .from(timetableSlots)
+    .innerJoin(periods, eq(timetableSlots.periodId, periods.id))
+    .innerJoin(subjects, eq(timetableSlots.subjectId, subjects.id))
+    .leftJoin(faculty, eq(timetableSlots.facultyId, faculty.id))
+    .where(
+      and(
+        eq(timetableSlots.sectionId, sectionId),
+        eq(timetableSlots.academicYearId, currentYear.id),
+        eq(timetableSlots.dayOfWeek, dayOfWeek),
+        eq(timetableSlots.isActive, true)
+      )
+    )
+    .orderBy(asc(periods.periodNumber));
+}
+
+export async function getAttendanceSessionForSlot(
+  slotId: string,
+  sessionDate: string
+) {
+  const [session] = await db
+    .select()
+    .from(attendanceSessions)
+    .where(
+      and(
+        eq(attendanceSessions.timetableSlotId, slotId),
+        eq(attendanceSessions.date, sessionDate)
+      )
+    )
+    .limit(1);
+
+  return session;
+}
+
+export async function getAttendanceRecordsForSession(sessionId: string) {
+  return db
+    .select({
+      id: attendanceRecords.id,
+      studentId: attendanceRecords.studentId,
+      status: attendanceRecords.status,
+    })
+    .from(attendanceRecords)
+    .where(eq(attendanceRecords.sessionId, sessionId));
 }
