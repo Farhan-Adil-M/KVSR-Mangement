@@ -1,11 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, BookOpen, Clock } from "lucide-react";
+import { getDashboardStats } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Dashboard | KVSR Management",
 };
 
-export default function DashboardPage() {
+export const revalidate = 60;
+
+export default async function DashboardPage() {
+  const stats = await getDashboardStats();
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -24,7 +29,7 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-kvsr-orange" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">843</div>
+            <div className="text-2xl font-bold text-kvsr-navy">{stats.students}</div>
             <p className="text-xs text-muted-foreground">Across all years</p>
           </CardContent>
         </Card>
@@ -37,7 +42,7 @@ export default function DashboardPage() {
             <BookOpen className="h-4 w-4 text-kvsr-orange" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">41</div>
+            <div className="text-2xl font-bold text-kvsr-navy">{stats.faculty}</div>
             <p className="text-xs text-muted-foreground">Including HOD</p>
           </CardContent>
         </Card>
@@ -50,7 +55,7 @@ export default function DashboardPage() {
             <Calendar className="h-4 w-4 text-kvsr-orange" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">530</div>
+            <div className="text-2xl font-bold text-kvsr-navy">{stats.slots}</div>
             <p className="text-xs text-muted-foreground">Weekly slots</p>
           </CardContent>
         </Card>
@@ -63,7 +68,7 @@ export default function DashboardPage() {
             <Clock className="h-4 w-4 text-kvsr-orange" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-kvsr-navy">7</div>
+            <div className="text-2xl font-bold text-kvsr-navy">{stats.periods}</div>
             <p className="text-xs text-muted-foreground">09:50 AM - 05:00 PM</p>
           </CardContent>
         </Card>

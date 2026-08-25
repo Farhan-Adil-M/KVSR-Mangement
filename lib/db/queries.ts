@@ -7,6 +7,7 @@ import {
   faculty,
   periods,
   academicYears,
+  students,
 } from "./schema";
 import { eq, asc, sql } from "drizzle-orm";
 
@@ -105,4 +106,29 @@ export async function getCurrentAcademicYear() {
     .where(eq(academicYears.isCurrent, true))
     .limit(1);
   return year;
+}
+
+export async function getDashboardStats() {
+  const [studentCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(students);
+
+  const [facultyCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(faculty);
+
+  const [slotCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(timetableSlots);
+
+  const [periodCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(periods);
+
+  return {
+    students: studentCount?.count ?? 0,
+    faculty: facultyCount?.count ?? 0,
+    slots: slotCount?.count ?? 0,
+    periods: periodCount?.count ?? 0,
+  };
 }

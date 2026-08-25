@@ -8,7 +8,7 @@ import Image from "next/image";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/timetable", label: "Timetable", icon: Calendar },
+  { href: "/timetable", label: "Timetable", icon: Calendar },
   { href: "#", label: "Students", icon: Users, disabled: true },
   { href: "#", label: "Faculty", icon: BookOpen, disabled: true },
   { href: "#", label: "Settings", icon: Settings, disabled: true },

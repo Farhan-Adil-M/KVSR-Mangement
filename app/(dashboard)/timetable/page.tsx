@@ -5,17 +5,23 @@ export const metadata = {
   title: "Timetable | KVSR Management",
 };
 
-export const revalidate = 60;
+interface TimetablePageProps {
+  searchParams: { section?: string };
+}
 
-export default async function TimetablePage() {
+export default async function TimetablePage({
+  searchParams,
+}: TimetablePageProps) {
   const sections = await getSections();
-  const firstSection = sections[0];
-  const slots = firstSection
-    ? await getTimetableForSection(firstSection.id)
+  const selectedSectionId = searchParams.section || sections[0]?.id;
+  const selectedSection = sections.find((s) => s.id === selectedSectionId);
+
+  const slots = selectedSection
+    ? await getTimetableForSection(selectedSection.id)
     : [];
 
-  const sectionName = firstSection
-    ? `${firstSection.year}-${firstSection.name}`
+  const sectionName = selectedSection
+    ? `${selectedSection.year}-${selectedSection.name}`
     : "No sections";
 
   return (
@@ -34,7 +40,34 @@ export default async function TimetablePage() {
           </p>
         </div>
       ) : (
-        <TimetableGrid slots={slots} sectionName={sectionName} />
+        <>
+          {/* Section selector */}
+          <div className="mb-6">
+            <p className="text-sm font-medium text-kvsr-navy mb-3">
+              Select Section
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {sections.map((section) => {
+                const isSelected = section.id === selectedSectionId;
+                return (
+                  <a
+                    key={section.id}
+                    href={`/timetable?section=${section.id}`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isSelected
+                        ? "bg-kvsr-navy text-white"
+                        : "bg-white border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {section.year}-{section.name}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+
+          <TimetableGrid slots={slots} sectionName={sectionName} />
+        </>
       )}
     </div>
   );
