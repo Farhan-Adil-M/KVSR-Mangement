@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Users, BookOpen, Calendar, Clock } from "lucide-react";
+import { Users, BookOpen, Calendar, Clock } from "lucide-react";
 
 interface DashboardStatsProps {
   students: number;
@@ -23,72 +23,60 @@ export function DashboardStats({
       value: students,
       subtitle: "Across all years",
       icon: Users,
-      gradient: "from-blue-500 to-blue-600",
-      lightGradient: "from-blue-50 to-blue-100",
-      iconColor: "text-blue-600",
+      color: "text-blue-600",
+      bg: "bg-blue-50",
     },
     {
       title: "Faculty Members",
       value: faculty,
       subtitle: "Including HOD",
       icon: BookOpen,
-      gradient: "from-kvsr-orange to-amber-500",
-      lightGradient: "from-orange-50 to-amber-100",
-      iconColor: "text-kvsr-orange",
+      color: "text-kvsr-cta",
+      bg: "bg-orange-50",
     },
     {
       title: "Timetable Slots",
       value: slots,
-      subtitle: "Weekly scheduled slots",
+      subtitle: "Weekly scheduled",
       icon: Calendar,
-      gradient: "from-emerald-500 to-emerald-600",
-      lightGradient: "from-emerald-50 to-emerald-100",
-      iconColor: "text-emerald-600",
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
     },
     {
       title: "Periods per Day",
       value: periods,
       subtitle: "09:50 AM - 05:00 PM",
       icon: Clock,
-      gradient: "from-violet-500 to-violet-600",
-      lightGradient: "from-violet-50 to-violet-100",
-      iconColor: "text-violet-600",
+      color: "text-violet-600",
+      bg: "bg-violet-50",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-8">
       {statCards.map((card, index) => {
         const Icon = card.icon;
         return (
           <motion.div
             key={card.title}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 + 0.2 }}
+            transition={{ duration: 0.45, delay: index * 0.08 + 0.1 }}
           >
-            <Card
-              className={`group relative overflow-hidden border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br ${card.lightGradient}`}
-            >
-              <div
-                className={`absolute top-0 right-0 w-32 h-32 rounded-full bg-gradient-to-br ${card.gradient} opacity-10 -translate-y-1/2 translate-x-1/2 group-hover:opacity-20 transition-opacity`}
-              />
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+            <Card className="relative overflow-hidden border border-kvsr-soft/80 bg-white shadow-sm hover:shadow-md transition-shadow duration-300 h-full">
+              <CardHeader className="flex flex-row items-start justify-between pb-3 pt-5 px-5">
+                <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">
                   {card.title}
                 </CardTitle>
-                <div
-                  className={`p-2 rounded-lg bg-gradient-to-br ${card.lightGradient}`}
-                >
-                  <Icon className={`h-5 w-5 ${card.iconColor}`} />
+                <div className={`p-2 rounded-lg ${card.bg} shrink-0 ml-3`}>
+                  <Icon className={`h-4 w-4 ${card.color}`} />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-kvsr-navy">
+              <CardContent className="px-5 pb-5 pt-0">
+                <div className="text-3xl font-bold text-kvsr-ink tracking-tight">
                   {card.value}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-emerald-500" />
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                   {card.subtitle}
                 </p>
               </CardContent>
