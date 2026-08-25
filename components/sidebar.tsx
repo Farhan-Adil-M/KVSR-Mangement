@@ -15,16 +15,22 @@ import {
   X,
   GraduationCap,
   ClipboardCheck,
+  type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
 
-const navItems = [
+const navItems: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+}[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/timetable", label: "Timetable", icon: Calendar },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/students", label: "Students", icon: Users },
   { href: "/faculty", label: "Faculty", icon: BookOpen },
-  { href: "#", label: "Settings", icon: Settings, disabled: true },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {

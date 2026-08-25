@@ -7,6 +7,7 @@ import {
   faculty,
   periods,
   academicYears,
+  programs,
   students,
   studentEnrollments,
   attendanceSessions,
@@ -318,6 +319,56 @@ export async function getFacultyList(search?: string) {
       f.fullName?.toLowerCase().includes(term) ||
       f.email?.toLowerCase().includes(term)
   );
+}
+
+export async function getSystemConfig() {
+  const [deptCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(departments);
+
+  const [programCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(programs);
+
+  const [yearCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(academicYears);
+
+  const [currentYear] = await db
+    .select()
+    .from(academicYears)
+    .where(eq(academicYears.isCurrent, true))
+    .limit(1);
+
+  return {
+    departments: deptCount?.count ?? 0,
+    programs: programCount?.count ?? 0,
+    academicYears: yearCount?.count ?? 0,
+    currentYear,
+  };
+}
+
+export async function getDepartmentsWithPrograms() {
+  return db
+    .select({
+      departmentId: departments.id,
+      departmentCode: departments.code,
+      departmentName: departments.name,
+      programId: programs.id,
+      programCode: programs.code,
+      programName: programs.name,
+      durationYears: programs.durationYears,
+    })
+    .from(departments)
+    .leftJoin(programs, eq(programs.departmentId, departments.id))
+    .orderBy(asc(departments.code), asc(programs.code));
+}
+
+export async function getPeriods() {
+  return db
+    .select()
+    .from(periods)
+    .orderBy(asc(periods.periodNumber));
 }
 
 export async function getFacultySchedule(facultyId: string) {
