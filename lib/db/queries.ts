@@ -12,6 +12,7 @@ import {
   attendanceSessions,
   attendanceRecords,
   studentAttendanceSummaries,
+  departments,
 } from "./schema";
 import { eq, and, asc, sql } from "drizzle-orm";
 
@@ -290,6 +291,75 @@ export async function getAttendanceSummaryForStudent(studentId: string) {
     .from(studentAttendanceSummaries)
     .innerJoin(subjects, eq(studentAttendanceSummaries.subjectId, subjects.id))
     .where(eq(studentAttendanceSummaries.studentId, studentId));
+}
+
+export async function getFacultyList(search?: string) {
+  const query = db
+    .select({
+      id: faculty.id,
+      fullName: faculty.fullName,
+      email: faculty.email,
+      phone: faculty.phone,
+      isHod: faculty.isHod,
+      department: departments.name,
+    })
+    .from(faculty)
+    .leftJoin(departments, eq(faculty.departmentId, departments.id))
+    .where(eq(faculty.isActive, true))
+    .orderBy(asc(faculty.fullName));
+
+  const results = await query;
+
+  if (!search || search.trim() === "") return results;
+
+  const term = search.toLowerCase();
+  return results.filter(
+    (f) =>
+      f.fullName?.toLowerCase().includes(term) ||
+      f.email?.toLowerCase().includes(term)
+  );
+}
+
+export async function getFacultySchedule(facultyId: string) {
+  const currentYear = await getCurrentAcademicYear();
+  if (!currentYear) return [];
+
+  return db
+    .select({
+      id: timetableSlots.id,
+      dayOfWeek: timetableSlots.dayOfWeek,
+      periodNumber: periods.periodNumber,
+      startTime: periods.startTime,
+      endTime: periods.endTime,
+      subject: subjects.name,
+      section: sections.name,
+      year: studyYears.label,
+      isLab: timetableSlots.isLab,
+    })
+    .from(timetableSlots)
+    .innerJoin(periods, eq(timetableSlots.periodId, periods.id))
+    .innerJoin(subjects, eq(timetableSlots.subjectId, subjects.id))
+    .innerJoin(sections, eq(timetableSlots.sectionId, sections.id))
+    .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
+    .where(
+      and(
+        eq(timetableSlots.facultyId, facultyId),
+        eq(timetableSlots.academicYearId, currentYear.id),
+        eq(timetableSlots.isActive, true)
+      )
+    )
+    .orderBy(
+      sql`CASE ${timetableSlots.dayOfWeek}
+        WHEN 'Monday' THEN 1
+        WHEN 'Tuesday' THEN 2
+        WHEN 'Wednesday' THEN 3
+        WHEN 'Thursday' THEN 4
+        WHEN 'Friday' THEN 5
+        WHEN 'Saturday' THEN 6
+        WHEN 'Sunday' THEN 7
+      END`,
+      asc(periods.periodNumber)
+    );
 }
 
 export async function getAttendanceReportBySection(sectionId: string) {
