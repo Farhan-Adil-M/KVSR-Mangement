@@ -112,7 +112,7 @@ export function AttendanceReport({
             return (
               <a
                 key={section.id}
-                href={`/attendance/reports?section=${section.id}`}
+                href={`/admin/attendance/reports?section=${section.id}`}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   isSelected
                     ? "bg-kvsr-navy text-white shadow-md"

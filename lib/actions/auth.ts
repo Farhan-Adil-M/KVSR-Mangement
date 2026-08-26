@@ -10,7 +10,7 @@ export async function login(
   username: string,
   password: string,
   role: "faculty" | "student"
-): Promise<{ success: false; error: string } | { success: true; user: SessionUser }> {
+): Promise<{ success: false; error: string } | { success: true; user: Omit<SessionUser, "exp"> }> {
   const trimmedUsername = username.trim();
   const trimmedPassword = password.trim();
 
@@ -40,7 +40,7 @@ export async function login(
       return { success: false, error: "Invalid username or password." };
     }
 
-    const user: SessionUser = {
+    const user: Omit<SessionUser, "exp"> = {
       id: member.id,
       name: member.fullName,
       role: member.isHod ? "admin" : "faculty",
@@ -66,7 +66,7 @@ export async function login(
     return { success: false, error: "Invalid roll number or password." };
   }
 
-  const user: SessionUser = {
+  const user: Omit<SessionUser, "exp"> = {
     id: student.id,
     name: student.fullName,
     role: "student",

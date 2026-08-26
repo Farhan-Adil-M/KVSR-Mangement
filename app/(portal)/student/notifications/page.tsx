@@ -1,0 +1,39 @@
+import { DashboardHeader } from "@/components/dashboard-header";
+import { EmptyState } from "@/components/empty-state";
+import { getStudentNotifications } from "@/lib/db/portal-queries";
+import { requireStudent } from "@/lib/auth/guards";
+import { Bell } from "lucide-react";
+
+export const metadata = { title: "Notifications | KVSR Management" };
+
+export default async function StudentNotificationsPage() {
+  const session = await requireStudent();
+  const notifications = await getStudentNotifications(session.id);
+
+  return (
+    <div className="p-6 sm:p-8">
+      <div className="max-w-7xl mx-auto">
+        <DashboardHeader title="Notifications" subtitle="Announcements for you" />
+
+        {notifications.length === 0 ? (
+          <EmptyState icon={Bell} title="No notifications" />
+        ) : (
+          <div className="space-y-3">
+            {notifications.map((n) => (
+              <div
+                key={n.id}
+                className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm"
+              >
+                <h3 className="font-semibold text-kvsr-ink">{n.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed mt-1">{n.body}</p>
+                <p className="text-xs text-kvsr-muted mt-2">
+                  {new Date(n.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

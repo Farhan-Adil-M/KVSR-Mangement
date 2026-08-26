@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { motion } from "motion/react";
-import { Check, X, Save, Users, Clock, BookOpen } from "lucide-react";
+import { Check, X, Save, Users, Clock, BookOpen, CircleDashed } from "lucide-react";
 import { saveAttendance } from "@/lib/actions/attendance";
 
 interface Student {
@@ -22,57 +22,38 @@ interface TimetableSlot {
   isLab: boolean;
 }
 
-interface AttendanceRecord {
-  studentId: string;
-  status: "present" | "absent";
-}
+type Status = "present" | "absent";
 
 interface AttendanceGridProps {
   students: Student[];
   slot: TimetableSlot;
   sessionDate: string;
-  sectionId: string;
-  existingRecords: AttendanceRecord[];
+  existingRecords: { studentId: string; status: Status }[];
 }
 
 export function AttendanceGrid({
   students,
   slot,
   sessionDate,
-  sectionId,
   existingRecords,
 }: AttendanceGridProps) {
-  const [records, setRecords] = useState<Record<string, "present" | "absent">>(
-    () => {
-      const initial: Record<string, "present" | "absent"> = {};
-      // Default all present
-      students.forEach((s) => (initial[s.id] = "present"));
-      // Override with existing records
-      existingRecords.forEach((r) => (initial[r.studentId] = r.status));
-      return initial;
-    }
-  );
-  const [isPending, startTransition] = useTransition();
-  const [message, setMessage] = useState<string | null>(null);
+  const [records, setRecords] = useState<Record<string, Status>>(() => {
+    const initial: Record<string, Status> = {};
+    students.forEach((s) => (initial[s.id] = "present"));
+    existingRecords.forEach((r) => (initial[r.studentId] = r.status));
+    return initial;
+  });
+  const [isPending, setIsPending] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const toggleStatus = (studentId: string) => {
-    setRecords((prev) => ({
-      ...prev,
-      [studentId]: prev[studentId] === "present" ? "absent" : "present",
-    }));
+  const setStatus = (studentId: string, status: Status) => {
+    setRecords((prev) => ({ ...prev, [studentId]: status }));
     setMessage(null);
   };
 
-  const allPresent = () => {
-    const updated: Record<string, "present" | "absent"> = {};
-    students.forEach((s) => (updated[s.id] = "present"));
-    setRecords(updated);
-    setMessage(null);
-  };
-
-  const allAbsent = () => {
-    const updated: Record<string, "present" | "absent"> = {};
-    students.forEach((s) => (updated[s.id] = "absent"));
+  const setAll = (status: Status) => {
+    const updated: Record<string, Status> = {};
+    students.forEach((s) => (updated[s.id] = status));
     setRecords(updated);
     setMessage(null);
   };
@@ -84,20 +65,23 @@ export function AttendanceGrid({
       status: records[s.id] || "present",
     }));
 
-    startTransition(async () => {
-      const result = await saveAttendance(
-        sessionDate,
-        slot.id,
-        slot.subjectId,
-        sectionId,
-        payload
-      );
-      if (result.success) {
-        setMessage("Attendance saved successfully.");
-      } else {
-        setMessage("Failed to save attendance. Please try again.");
+    setIsPending(true);
+    void (async () => {
+      try {
+        const result = await saveAttendance({
+          sessionDate,
+          timetableSlotId: slot.id,
+          records: payload,
+        });
+        setMessage(
+          result.success
+            ? { ok: true, text: "Attendance saved successfully." }
+            : { ok: false, text: result.error }
+        );
+      } finally {
+        setIsPending(false);
       }
-    });
+    })();
   };
 
   const presentCount = students.filter((s) => records[s.id] === "present").length;
@@ -129,10 +113,10 @@ export function AttendanceGrid({
           </div>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <div className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-medium">
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
             {presentCount} Present
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 font-medium">
+          <div className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 font-semibold">
             {absentCount} Absent
           </div>
         </div>
@@ -142,14 +126,14 @@ export function AttendanceGrid({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={allPresent}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-kvsr-soft hover:bg-kvsr-navy/5 transition-colors"
+            onClick={() => setAll("present")}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
           >
             Mark all present
           </button>
           <button
-            onClick={allAbsent}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-kvsr-soft hover:bg-kvsr-navy/5 transition-colors"
+            onClick={() => setAll("absent")}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-200 text-red-700 hover:bg-red-50 transition-colors"
           >
             Mark all absent
           </button>
@@ -162,10 +146,10 @@ export function AttendanceGrid({
 
       {/* Student list */}
       <div className="bg-white rounded-2xl border border-kvsr-soft shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[60px_1fr_120px] sm:grid-cols-[80px_1fr_140px] gap-4 px-5 py-3 bg-kvsr-navy/[0.03] text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="grid grid-cols-[60px_1fr_220px] sm:grid-cols-[80px_1fr_260px] gap-4 px-5 py-3 bg-kvsr-navy/[0.03] text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <span>Roll #</span>
           <span>Name</span>
-          <span className="text-right">Status</span>
+          <span className="text-right">Attendance</span>
         </div>
         <div className="divide-y divide-kvsr-soft">
           {students.map((student, index) => {
@@ -176,7 +160,7 @@ export function AttendanceGrid({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, delay: index * 0.02 }}
-                className="grid grid-cols-[60px_1fr_120px] sm:grid-cols-[80px_1fr_140px] gap-4 px-5 py-3 items-center hover:bg-kvsr-navy/[0.02] transition-colors"
+                className="grid grid-cols-[60px_1fr_220px] sm:grid-cols-[80px_1fr_260px] gap-4 px-5 py-3 items-center hover:bg-kvsr-navy/[0.02] transition-colors"
               >
                 <span className="text-sm font-medium text-kvsr-muted">
                   {student.rollNumber}
@@ -184,26 +168,32 @@ export function AttendanceGrid({
                 <span className="text-sm font-medium text-kvsr-ink truncate">
                   {student.fullName}
                 </span>
-                <div className="flex justify-end">
+                <div className="flex justify-end" role="group" aria-label={`Attendance for ${student.fullName}`}>
+                  {/* Present toggle */}
                   <button
-                    onClick={() => toggleStatus(student.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold ${
+                    onClick={() => setStatus(student.id, "present")}
+                    aria-pressed={status === "present"}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-l-full text-xs font-semibold border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold ${
                       status === "present"
-                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                        : "bg-red-50 text-red-700 hover:bg-red-100"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                        : "bg-white text-muted-foreground border-kvsr-soft hover:border-emerald-300 hover:text-emerald-700"
                     }`}
                   >
-                    {status === "present" ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        Present
-                      </>
-                    ) : (
-                      <>
-                        <X className="w-3.5 h-3.5" />
-                        Absent
-                      </>
-                    )}
+                    <Check className="w-3.5 h-3.5" />
+                    Present
+                  </button>
+                  {/* Absent toggle */}
+                  <button
+                    onClick={() => setStatus(student.id, "absent")}
+                    aria-pressed={status === "absent"}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-r-full text-xs font-semibold border border-l-0 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold ${
+                      status === "absent"
+                        ? "bg-red-600 text-white border-red-600 shadow-sm"
+                        : "bg-white text-muted-foreground border-kvsr-soft hover:border-red-300 hover:text-red-700"
+                    }`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Absent
                   </button>
                 </div>
               </motion.div>
@@ -214,16 +204,19 @@ export function AttendanceGrid({
 
       {/* Submit */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        {message && (
+        {message ? (
           <p
-            className={`text-sm ${
-              message.includes("success") ? "text-emerald-600" : "text-red-600"
-            }`}
+            className={`text-sm font-medium ${message.ok ? "text-emerald-600" : "text-red-600"}`}
+            role="status"
           >
-            {message}
+            {message.text}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <CircleDashed className="w-3.5 h-3.5" />
+            Tap Present or Absent for each student, then save.
           </p>
         )}
-        {!message && <div />}
         <button
           onClick={handleSubmit}
           disabled={isPending || students.length === 0}

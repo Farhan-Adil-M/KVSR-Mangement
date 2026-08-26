@@ -1,12 +1,24 @@
 import { cookies } from "next/headers";
 
 const COOKIE_NAME = "kvsr_session";
-const SECRET = process.env.SESSION_SECRET || "kvsr-dev-secret-change-in-production";
+const SESSION_DAYS = 7;
+
+// Fail closed: never fall back to a known constant (forgeable sessions).
+const SECRET = process.env.SESSION_SECRET;
+if (!SECRET) {
+  throw new Error("SESSION_SECRET must be set in the environment.");
+}
 
 export interface SessionUser {
   id: string;
   name: string;
   role: "admin" | "faculty" | "student";
+  /** Unix seconds — session expiry, enforced on every verify. */
+  exp: number;
+}
+
+export function createSessionPayload(user: Omit<SessionUser, "exp">): SessionUser {
+  return { ...user, exp: Math.floor(Date.now() / 1000) + SESSION_DAYS * 24 * 60 * 60 };
 }
 
 async function getKey() {
@@ -60,22 +72,24 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!value) return null;
 
   try {
-    return JSON.parse(value) as SessionUser;
+    const parsed = JSON.parse(value) as SessionUser;
+    if (!parsed.exp || parsed.exp < Math.floor(Date.now() / 1000)) return null;
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export async function setSession(user: SessionUser) {
+export async function setSession(user: Omit<SessionUser, "exp">) {
   const cookieStore = await cookies();
-  const value = JSON.stringify(user);
+  const value = JSON.stringify(createSessionPayload(user));
   const signed = await sign(value);
 
   cookieStore.set(COOKIE_NAME, signed, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
     path: "/",
   });
 }

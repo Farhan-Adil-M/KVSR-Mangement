@@ -2,13 +2,30 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const COOKIE_NAME = "kvsr_session";
-const SECRET = process.env.SESSION_SECRET || "kvsr-dev-secret-change-in-production";
+// Fail closed: never fall back to a known constant (forgeable sessions).
+const SECRET = process.env.SESSION_SECRET;
+if (!SECRET) {
+  throw new Error("SESSION_SECRET must be set in the environment.");
+}
 
-interface SessionUser {
+interface SessionPayload {
   id: string;
   name: string;
   role: "admin" | "faculty" | "student";
+  exp: number;
 }
+
+const ROLE_PREFIX: Record<SessionPayload["role"], string> = {
+  admin: "/admin",
+  faculty: "/faculty",
+  student: "/student",
+};
+
+const ROLE_HOME: Record<SessionPayload["role"], string> = {
+  admin: "/admin/dashboard",
+  faculty: "/faculty/dashboard",
+  student: "/student/dashboard",
+};
 
 async function getKey() {
   const encoder = new TextEncoder();
@@ -21,7 +38,7 @@ async function getKey() {
   );
 }
 
-async function verifySession(cookieValue: string): Promise<SessionUser | null> {
+async function verifySession(cookieValue: string): Promise<SessionPayload | null> {
   const lastDot = cookieValue.lastIndexOf(".");
   if (lastDot === -1) return null;
 
@@ -39,7 +56,9 @@ async function verifySession(cookieValue: string): Promise<SessionUser | null> {
       encoder.encode(value)
     );
     if (!valid) return null;
-    return JSON.parse(value) as SessionUser;
+    const parsed = JSON.parse(value) as SessionPayload;
+    if (!parsed.exp || parsed.exp < Math.floor(Date.now() / 1000)) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -53,32 +72,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Protected dashboard routes
-  if (
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/timetable") ||
-    pathname.startsWith("/attendance") ||
-    pathname.startsWith("/students") ||
+  const isPortalRoute =
+    pathname.startsWith("/admin") ||
     pathname.startsWith("/faculty") ||
-    pathname.startsWith("/settings")
-  ) {
+    pathname.startsWith("/student");
+
+  if (isPortalRoute) {
     const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
     const session = sessionCookie ? await verifySession(sessionCookie) : null;
 
     if (!session) {
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Student role restrictions
-    if (session.role === "student") {
-      // Students can only access dashboard and their own attendance/students view
-      const allowedPaths = ["/dashboard", "/attendance/reports", "/students"];
-      const isAllowed = allowedPaths.some((path) => pathname === path || pathname.startsWith(path));
-      if (!isAllowed) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
+    // Role-prefix enforcement: /admin/* admin-only, /faculty/* faculty-only, /student/* student-only
+    const allowedPrefix = ROLE_PREFIX[session.role];
+    if (!pathname.startsWith(allowedPrefix)) {
+      return NextResponse.redirect(new URL(ROLE_HOME[session.role], request.url));
+    }
+
+    // Bare portal roots redirect to the role home
+    if (pathname === "/admin" || pathname === "/faculty" || pathname === "/student") {
+      return NextResponse.redirect(new URL(ROLE_HOME[session.role], request.url));
     }
   }
 
@@ -86,7 +102,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // NOTE: /api is excluded — if API routes are ever added, they MUST enforce
+  // auth server-side (guards) because middleware does not cover them.
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|College_logo.jpg).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|College_logo.jpg|sw.js|swe-worker).*)",
   ],
 };

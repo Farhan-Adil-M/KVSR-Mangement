@@ -25,7 +25,7 @@ export function FacultyList({ faculty, searchQuery }: FacultyListProps) {
     <div className="space-y-5">
       {/* Search */}
       <form
-        action="/faculty"
+        action="/admin/faculty"
         method="GET"
         className="flex flex-col sm:flex-row gap-3"
       >
@@ -48,7 +48,7 @@ export function FacultyList({ faculty, searchQuery }: FacultyListProps) {
         </button>
         {searchQuery && (
           <a
-            href="/faculty"
+            href="/admin/faculty"
             className="px-4 py-3 border border-kvsr-soft rounded-xl text-sm font-medium text-muted-foreground hover:bg-kvsr-navy/[0.03] transition-colors flex items-center justify-center gap-2"
           >
             <X className="w-4 h-4" />
@@ -78,7 +78,7 @@ export function FacultyList({ faculty, searchQuery }: FacultyListProps) {
               transition={{ duration: 0.3, delay: index * 0.03 }}
             >
               <a
-                href={`/faculty/${member.id}`}
+                href={`/admin/faculty/${member.id}`}
                 className="block p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm hover:shadow-md hover:border-kvsr-navy/10 transition-all group h-full"
               >
                 <div className="flex items-start justify-between gap-3 mb-4">

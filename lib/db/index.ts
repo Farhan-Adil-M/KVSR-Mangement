@@ -14,3 +14,5 @@ function getDatabaseUrl() {
 
 const sql = neon(getDatabaseUrl());
 export const db = drizzle(sql, { schema });
+/** Raw tagged-template client for complex aggregate queries. */
+export const rawSql = sql;

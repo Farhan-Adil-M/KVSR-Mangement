@@ -65,7 +65,7 @@ export function TimetableGrid({
             return (
               <a
                 key={section.id}
-                href={`/timetable?section=${section.id}`}
+                href={`/admin/timetable?section=${section.id}`}
                 className={`relative px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                   isSelected
                     ? "bg-kvsr-navy text-white shadow-lg shadow-kvsr-navy/25"
