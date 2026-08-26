@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Search } from "lucide-react";
 import { saveMarks } from "@/lib/actions/teaching";
 
 interface StudentRow {
@@ -36,6 +36,14 @@ export function MarksEntryForm({
   const [scores, setScores] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const q = search.trim().toLowerCase();
+  const visibleStudents = q
+    ? students.filter(
+        (s) => s.fullName.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
+      )
+    : students;
 
   const existingTitles = Object.keys(existingMarks);
 
@@ -159,6 +167,19 @@ export function MarksEntryForm({
         </div>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-kvsr-muted" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a student by name or roll number…"
+          aria-label="Search students in this class"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-kvsr-soft text-sm bg-white focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+        />
+      </div>
+
       <div className="bg-white rounded-2xl border border-kvsr-soft shadow-sm overflow-hidden">
         <div className="grid grid-cols-[70px_1fr_110px] sm:grid-cols-[90px_1fr_130px] gap-3 px-5 py-3 bg-kvsr-navy/[0.03] text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <span>Roll #</span>
@@ -166,7 +187,7 @@ export function MarksEntryForm({
           <span className="text-right">Marks</span>
         </div>
         <div className="divide-y divide-kvsr-soft">
-          {students.map((s) => (
+          {visibleStudents.map((s) => (
             <div
               key={s.id}
               className="grid grid-cols-[70px_1fr_110px] sm:grid-cols-[90px_1fr_130px] gap-3 px-5 py-2.5 items-center"
@@ -186,6 +207,11 @@ export function MarksEntryForm({
               />
             </div>
           ))}
+          {visibleStudents.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              No students match “{search}”.
+            </div>
+          )}
         </div>
       </div>
 

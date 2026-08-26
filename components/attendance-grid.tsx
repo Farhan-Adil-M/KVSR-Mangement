@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Check, X, Save, Users, Clock, BookOpen, CircleDashed } from "lucide-react";
+import { Check, X, Save, Users, Clock, BookOpen, CircleDashed, Search } from "lucide-react";
 import { saveAttendance } from "@/lib/actions/attendance";
 
 interface Student {
@@ -87,6 +87,14 @@ export function AttendanceGrid({
   const presentCount = students.filter((s) => records[s.id] === "present").length;
   const absentCount = students.length - presentCount;
 
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const visibleStudents = q
+    ? students.filter(
+        (s) => s.fullName.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
+      )
+    : students;
+
   return (
     <div className="space-y-5">
       {/* Slot info */}
@@ -144,6 +152,19 @@ export function AttendanceGrid({
         </div>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-kvsr-muted" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a student by name or roll number…"
+          aria-label="Search students in this class"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-kvsr-soft text-sm bg-white focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+        />
+      </div>
+
       {/* Student list */}
       <div className="bg-white rounded-2xl border border-kvsr-soft shadow-sm overflow-hidden">
         <div className="grid grid-cols-[60px_1fr_220px] sm:grid-cols-[80px_1fr_260px] gap-4 px-5 py-3 bg-kvsr-navy/[0.03] text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -152,7 +173,7 @@ export function AttendanceGrid({
           <span className="text-right">Attendance</span>
         </div>
         <div className="divide-y divide-kvsr-soft">
-          {students.map((student, index) => {
+          {visibleStudents.map((student, index) => {
             const status = records[student.id] || "present";
             return (
               <motion.div
@@ -199,6 +220,11 @@ export function AttendanceGrid({
               </motion.div>
             );
           })}
+          {visibleStudents.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              No students match “{search}”.
+            </div>
+          )}
         </div>
       </div>
 

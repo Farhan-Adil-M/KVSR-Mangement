@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "motion/react";
-import { Users, TrendingDown, BookOpen, AlertCircle } from "lucide-react";
+import { Users, TrendingDown, BookOpen, AlertCircle, Search } from "lucide-react";
 
 interface ReportRow {
   studentId: string;
@@ -98,6 +99,14 @@ export function AttendanceReport({
   }));
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
+
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const visibleStudents = q
+    ? students.filter(
+        (s) => s.fullName.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
+      )
+    : students;
 
   return (
     <div className="space-y-6">
@@ -223,11 +232,22 @@ export function AttendanceReport({
 
           {/* Student breakdown */}
           <div className="bg-white rounded-2xl border border-kvsr-soft shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-kvsr-soft">
+            <div className="px-5 py-4 border-b border-kvsr-soft space-y-3">
               <h3 className="font-semibold text-kvsr-ink">Student Attendance</h3>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-kvsr-muted" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Find a student by name or roll number…"
+                  aria-label="Search students in report"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-kvsr-soft text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+                />
+              </div>
             </div>
             <div className="divide-y divide-kvsr-soft">
-              {students.map((student, index) => (
+              {visibleStudents.map((student, index) => (
                 <motion.div
                   key={student.id}
                   initial={{ opacity: 0, y: 6 }}
@@ -269,6 +289,11 @@ export function AttendanceReport({
                   </div>
                 </motion.div>
               ))}
+              {visibleStudents.length === 0 && (
+                <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                  No students match “{search}”.
+                </div>
+              )}
             </div>
           </div>
         </>

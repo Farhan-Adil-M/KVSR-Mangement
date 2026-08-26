@@ -75,8 +75,9 @@ export async function getFacultyDaySlots(facultyId: string, day: string) {
 /** Distinct students across the faculty's assigned sections. */
 export async function getFacultyStudents(facultyId: string) {
   const rows = await rawSql`
-    SELECT DISTINCT st.id, st.roll_number AS "rollNumber", st.full_name AS "fullName",
-           sec.id AS "sectionId", sec.name AS section, sy.label AS year
+    SELECT st.id, st.roll_number AS "rollNumber", st.full_name AS "fullName",
+           sec.id AS "sectionId", sec.name AS section, sy.label AS year,
+           sy.year_number AS "yearNumber"
     FROM faculty_assignments fa
     JOIN sections sec ON fa.section_id = sec.id
     JOIN study_years sy ON sec.study_year_id = sy.id
@@ -85,6 +86,7 @@ export async function getFacultyStudents(facultyId: string) {
     JOIN students st ON se.student_id = st.id
     JOIN academic_years ay ON fa.academic_year_id = ay.id AND ay.is_current = true
     WHERE fa.faculty_id = ${facultyId}
+    GROUP BY st.id, st.roll_number, st.full_name, sec.id, sec.name, sy.label, sy.year_number
     ORDER BY sy.year_number, sec.name, st.roll_number
   `;
   return rows as unknown as {
@@ -94,6 +96,27 @@ export async function getFacultyStudents(facultyId: string) {
     sectionId: string;
     section: string;
     year: string;
+  }[];
+}
+
+/** All evaluations by this faculty for one section, in a single round-trip. */
+export async function getFacultySectionEvaluations(
+  facultyId: string,
+  sectionId: string
+) {
+  const rows = await rawSql`
+    SELECT student_id AS "studentId", academic_performance AS "academicPerformance",
+           behaviour, participation, comments
+    FROM student_evaluations
+    WHERE faculty_id = ${facultyId} AND section_id = ${sectionId}
+      AND academic_year_id = (SELECT id FROM academic_years WHERE is_current = true)
+  `;
+  return rows as unknown as {
+    studentId: string;
+    academicPerformance: number;
+    behaviour: number;
+    participation: number;
+    comments: string | null;
   }[];
 }
 

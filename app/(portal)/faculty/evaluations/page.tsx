@@ -1,10 +1,10 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
-import { EvaluationForm } from "@/components/evaluation-form";
+import { EvaluationsGrid } from "@/components/evaluations-grid";
 import { getFacultyAssignments, requireFaculty } from "@/lib/auth/guards";
-import { getFacultyEvaluationForStudent } from "@/lib/db/portal-queries";
+import { getFacultySectionEvaluations } from "@/lib/db/portal-queries";
 import { getStudentsBySection } from "@/lib/db/queries";
-import { Star, Users } from "lucide-react";
+import { Star } from "lucide-react";
 
 export const metadata = { title: "Student Evaluation | KVSR Management" };
 export const dynamic = "force-dynamic";
@@ -36,25 +36,28 @@ export default async function FacultyEvaluationsPage({ searchParams }: PageProps
     ? await getStudentsBySection(selectedSectionId)
     : [];
 
-  const evaluations = selectedSectionId
-    ? await Promise.all(
-        students.map(async (s) => ({
-          studentId: s.id,
-          evaluation: await getFacultyEvaluationForStudent(session.id, s.id, selectedSectionId),
-        }))
-      )
+  // One batched query for the whole section — no per-student round-trips.
+  const evaluationRows = selectedSectionId
+    ? await getFacultySectionEvaluations(session.id, selectedSectionId)
     : [];
-  const evalMap = new Map(evaluations.map((e) => [e.studentId, e.evaluation]));
-
-  const selectedLabel =
-    mySections.find((s) => s.id === selectedSectionId)?.label ?? "";
+  const evaluations = Object.fromEntries(
+    evaluationRows.map((e) => [
+      e.studentId,
+      {
+        academicPerformance: e.academicPerformance,
+        behaviour: e.behaviour,
+        participation: e.participation,
+        comments: e.comments,
+      },
+    ])
+  );
 
   return (
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader
           title="Student Evaluation"
-          subtitle="Rate students you teach: Academic Performance, Behaviour, Class Participation (1–5)"
+          subtitle="Click a student to rate Academic Performance, Behaviour, and Class Participation (1–5)"
         />
 
         {/* Class picker */}
@@ -92,34 +95,17 @@ export default async function FacultyEvaluationsPage({ searchParams }: PageProps
             description="Choose one of your assigned classes to evaluate its students."
           />
         ) : students.length === 0 ? (
-          <EmptyState icon={Users} title="No students in this class" />
+          <EmptyState
+            icon={Star}
+            title="No students in this class"
+            description="No active students are enrolled in this section."
+          />
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {students.length} students · {selectedLabel}
-            </p>
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-kvsr-ink">{student.fullName}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Roll #{student.rollNumber}
-                    </p>
-                  </div>
-                </div>
-                <EvaluationForm
-                  studentId={student.id}
-                  studentName={student.fullName}
-                  sectionId={selectedSectionId}
-                  existing={evalMap.get(student.id) ?? null}
-                />
-              </div>
-            ))}
-          </div>
+          <EvaluationsGrid
+            students={students}
+            evaluations={evaluations}
+            sectionId={selectedSectionId}
+          />
         )}
       </div>
     </div>
