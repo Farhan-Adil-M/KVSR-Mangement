@@ -96,26 +96,29 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
   }
 
   try {
-    const sessionId = await db.transaction(async (tx) => {
-      const [existingSession] = await tx
-        .select({ id: attendanceSessions.id })
-        .from(attendanceSessions)
-        .where(
-          and(
-            eq(attendanceSessions.timetableSlotId, timetableSlotId),
-            eq(attendanceSessions.date, sessionDate)
-          )
+    // neon-http driver does NOT support db.transaction(); resolve the session
+    // with sequential queries. Unique indexes (unique_session_slot_day on
+    // sessions, unique_attendance_record on records) keep this safe.
+    const [existingSession] = await db
+      .select({ id: attendanceSessions.id })
+      .from(attendanceSessions)
+      .where(
+        and(
+          eq(attendanceSessions.timetableSlotId, timetableSlotId),
+          eq(attendanceSessions.date, sessionDate)
         )
-        .limit(1);
+      )
+      .limit(1);
 
-      if (existingSession) {
-        await tx
-          .delete(attendanceRecords)
-          .where(eq(attendanceRecords.sessionId, existingSession.id));
-        return existingSession.id;
-      }
-
-      const [newSession] = await tx
+    let sessionId: string;
+    if (existingSession) {
+      sessionId = existingSession.id;
+      // Clear prior rows before re-inserting (re-save case).
+      await db
+        .delete(attendanceRecords)
+        .where(eq(attendanceRecords.sessionId, sessionId));
+    } else {
+      const [newSession] = await db
         .insert(attendanceSessions)
         .values({
           date: sessionDate,
@@ -128,20 +131,18 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
           submittedBy: session.role === "faculty" ? session.id : null,
         })
         .returning({ id: attendanceSessions.id });
-      return newSession.id;
-    });
+      sessionId = newSession.id;
+    }
 
-    await db.transaction(async (tx) => {
-      await tx.insert(attendanceRecords).values(
-        uniqueRecords.map((record) => ({
-          sessionId,
-          studentId: record.studentId,
-          status: record.status,
-          recordedBy: session.role === "faculty" ? session.id : null,
-          recordedAt: new Date(),
-        }))
-      );
-    });
+    await db.insert(attendanceRecords).values(
+      uniqueRecords.map((record) => ({
+        sessionId,
+        studentId: record.studentId,
+        status: record.status,
+        recordedBy: session.role === "faculty" ? session.id : null,
+        recordedAt: new Date(),
+      }))
+    );
 
     revalidatePath("/faculty/attendance");
     revalidatePath("/faculty/dashboard");
