@@ -1,0 +1,103 @@
+name: Build Android APK (TWA)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      pwa_url:
+        description: "Deployed PWA URL (must be HTTPS and reachable)"
+        required: true
+
+permissions:
+  contents: write # needed to create a GitHub Release and upload the APK
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    env:
+      PWA_URL: ${{ github.event.inputs.pwa_url || secrets.PWA_URL }}
+      KEYSTORE_PATH: ${{ github.workspace }}/android-key.keystore
+      KEY_ALIAS: kvsr
+      PACKAGE_ID: com.kvsr.mgmt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java (Temurin 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform & build-tools
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Provide signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not set. Create a keystore and add it as a repo secret:" >&2
+            echo "  keytool -genkeypair -v -keystore android-key.keystore -alias $KEY_ALIAS -keyalg RSA -keysize 2048 -validity 10000" >&2
+            echo "  base64 -w0 android-key.keystore > keystore.b64  # paste into ANDROID_ASSETLINKS/KEYSTORE_BASE64" >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+
+      - name: Initialize TWA (Bubblewrap)
+        run: |
+          npx --yes @bubblewrap/cli@1.25.0 init \
+            --manifest "$PWA_URL" \
+            --packageId "$PACKAGE_ID" \
+            --appName "KVSR Management" \
+            --themeColor #021B43 \
+            --navigationColor #021B43 \
+            --backgroundColor #ffffff \
+            --icon ./public/College_logo.jpg \
+            --maskableIcon ./public/College_logo.jpg \
+            --signingKeyPath "$KEYSTORE_PATH" \
+            --signingKeyAlias "$KEY_ALIAS" \
+            --skipVersionCheck
+
+      - name: Build signed APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: npx --yes @bubblewrap/cli@1.25.0 build
+
+      - name: Compute keystore SHA256 (for assetlinks.json)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          SHA=$(keytool -list -v -keystore "$KEYSTORE_PATH" -alias "$KEY_ALIAS" \
+            -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
+            | grep -i "SHA256:" | sed 's/.*SHA256:\s*//')
+          echo "KEYSTORE_SHA256=$SHA" >> "$GITHUB_ENV"
+          echo "::notice::Add this SHA256 to ANDROID_ASSETLINKS on your host: $SHA"
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+
+      - name: Upload APK (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kvsr-management-apk
+          path: android/app/build/outputs/apk/release/app-release.apk

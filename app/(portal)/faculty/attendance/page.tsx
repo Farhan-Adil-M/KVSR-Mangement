@@ -1,6 +1,6 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
-import { AttendanceGrid } from "@/components/attendance-grid";
+import { AttendanceMarking } from "@/components/attendance-marking";
 import { getFacultyDaySlots } from "@/lib/db/portal-queries";
 import { requireFaculty } from "@/lib/auth/guards";
 import {
@@ -109,7 +109,7 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
         {/* Marking grid */}
         {selectedSlot ? (
           students.length > 0 ? (
-            <AttendanceGrid
+            <AttendanceMarking
               students={students}
               slot={{
                 id: selectedSlot.id,
@@ -121,8 +121,10 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
                 faculty: session.name,
                 isLab: selectedSlot.isLab,
               }}
+              sectionId={selectedSlot.sectionId}
               sessionDate={collegeNow.date}
               existingRecords={existingRecords}
+              slotLabel={`P${selectedSlot.periodNumber} · ${selectedSlot.subject} · ${selectedSlot.year}-${selectedSlot.section}`}
             />
           ) : (
             <EmptyState

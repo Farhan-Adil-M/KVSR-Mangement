@@ -8,6 +8,7 @@ import {
   date,
   time,
   numeric,
+  jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -268,6 +269,34 @@ export const attendanceRecords = pgTable(
   (table) => ({
     uniqueRecord: uniqueIndex("unique_attendance_record").on(
       table.sessionId,
+      table.studentId
+    ),
+  })
+);
+
+// Biometrics — stores ONLY numeric face embeddings (never raw images)
+export const studentBiometrics = pgTable(
+  "student_biometrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id")
+      .notNull()
+      .unique()
+      .references(() => students.id, { onDelete: "cascade" }),
+    // 128-d face descriptor from face-api recognition net.
+    descriptor: jsonb("descriptor").notNull(),
+    modelVersion: text("model_version").notNull().default("faceapi-tiny-1"),
+    // Server-recorded consent evidence (timestamp + policy version), not client-asserted.
+    consentedAt: timestamp("consented_at", { withTimezone: true }),
+    consentVersion: text("consent_version"),
+    enrolledBy: uuid("enrolled_by").references(() => faculty.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    studentBiometricIdx: uniqueIndex("unique_student_biometric").on(
       table.studentId
     ),
   })

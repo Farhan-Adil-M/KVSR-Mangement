@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Star,
   User,
+  Fingerprint,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -49,6 +50,7 @@ const FACULTY_NAV: NavItem[] = [
   { href: "/faculty/timetable", label: "My Timetable", icon: Calendar },
   { href: "/faculty/classes", label: "My Classes", icon: BookOpen },
   { href: "/faculty/attendance", label: "Attendance", icon: ClipboardCheck },
+  { href: "/faculty/biometrics", label: "Biometrics", icon: Fingerprint },
   { href: "/faculty/students", label: "My Students", icon: Users },
   { href: "/faculty/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/faculty/marks", label: "Marks Entry", icon: Award },

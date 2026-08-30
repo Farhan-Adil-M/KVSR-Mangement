@@ -38,3 +38,9 @@ public/swe-worker-*.js*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Bubblewrap / TWA build artifacts (generated in CI)
+/android/
+/twa-manifest.json
+*.keystore
+

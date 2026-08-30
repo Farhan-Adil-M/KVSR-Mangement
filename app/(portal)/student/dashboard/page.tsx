@@ -64,7 +64,7 @@ export default async function StudentDashboardPage() {
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader
-          title={`Hello, ${session.name.split(" ")[0]}`}
+          title={`Hello, ${session.name}`}
           subtitle={`${ctx.yearLabel}-${ctx.sectionName} · Roll #${ctx.rollNumber}`}
         />
 
