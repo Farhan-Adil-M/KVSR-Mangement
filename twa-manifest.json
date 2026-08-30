@@ -3,7 +3,7 @@
   "packageId": "com.kvsr.mgmt",
   "name": "KVSR Management",
   "launcherName": "KVSR",
-  "host": "https://kvsr-mangement-tau.vercel.app",
+  "host": "kvsr-mangement-tau.vercel.app",
   "startUrl": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -19,8 +19,8 @@
   "iconUrl": "https://kvsr-mangement-tau.vercel.app/College_logo.jpg",
   "maskableIconUrl": "https://kvsr-mangement-tau.vercel.app/College_logo.jpg",
   "splashScreenFadeOutDuration": 300,
-  "appVersion": "1.0.6",
-  "appVersionCode": 6,
+  "appVersion": "1.0.7",
+  "appVersionCode": 7,
   "signingKey": {
     "path": "android-key.keystore",
     "alias": "kvsr"
