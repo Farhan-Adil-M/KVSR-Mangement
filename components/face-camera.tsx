@@ -8,6 +8,7 @@ import {
   useEffect,
 } from "react";
 import type * as FaceApi from "@vladmandic/face-api";
+import { SwitchCamera } from "lucide-react";
 
 export interface FaceCameraHandle {
   /** Descriptors (128-d) of every face currently in frame. */
@@ -35,7 +36,9 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
   const faceapiRef = useRef<typeof FaceApi | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
+  // Load face-api models once.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -49,9 +52,26 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
-        if (cancelled) return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Could not load face models.";
+        setError(msg);
+        onStatus?.(msg);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [onStatus]);
+
+  // Start/restart the camera whenever the facing mode (or size) changes.
+  useEffect(() => {
+    let cancelled = false;
+    setReady(false);
+    setError(null);
+    (async () => {
+      try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width, height },
+          video: { facingMode, width, height },
           audio: false,
         });
         if (cancelled) {
@@ -64,7 +84,9 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
         video.srcObject = stream;
         await video.play();
         setReady(true);
-        onStatus?.("Camera ready — position faces in frame.");
+        onStatus?.(
+          `Camera ready (${facingMode === "user" ? "front" : "back"}) — position faces in frame.`
+        );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Could not start camera.";
         setError(msg);
@@ -75,7 +97,11 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [width, height, onStatus]);
+  }, [facingMode, width, height, onStatus]);
+
+  const switchCamera = () => {
+    setFacingMode((m) => (m === "user" ? "environment" : "user"));
+  };
 
   const detect = async (withDescriptor: boolean) => {
     const faceapi = faceapiRef.current;
@@ -157,6 +183,18 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
         muted
         playsInline
       />
+
+      <button
+        type="button"
+        onClick={switchCamera}
+        aria-label="Switch camera"
+        title="Switch front / back camera"
+        className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/50 text-white text-xs font-semibold backdrop-blur-sm hover:bg-black/70 transition-colors"
+      >
+        <SwitchCamera className="w-4 h-4" />
+        {facingMode === "user" ? "Front" : "Back"}
+      </button>
+
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-white/80">
           {error ?? "Starting camera…"}
