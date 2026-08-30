@@ -41,6 +41,6 @@ next-env.d.ts
 
 # Bubblewrap / TWA build artifacts (generated in CI)
 /android/
-/twa-manifest.json
 *.keystore
+
 
