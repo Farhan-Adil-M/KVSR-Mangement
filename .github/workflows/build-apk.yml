@@ -61,8 +61,8 @@ jobs:
         run: |
           echo "JAVA_HOME=$JAVA_HOME"
           which java || echo "java not on PATH"
-          # Pipe "n" to Bubblewrap's JDK prompt -> use the JDK we installed (no download, non-interactive).
-          printf 'n\n' | npx --yes @bubblewrap/cli@1.25.0 init \
+          # Answer Bubblewrap's prompts: "n" (no install) then the existing JDK path -> non-interactive.
+          printf 'n\n%s\n' "$JAVA_HOME" | npx --yes @bubblewrap/cli@1.25.0 init \
             --manifest "$PWA_URL" \
             --packageId "$PACKAGE_ID" \
             --appName "KVSR Management" \
