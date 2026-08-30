@@ -57,8 +57,12 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
 
       - name: Initialize TWA (Bubblewrap)
+        shell: bash
         run: |
-          npx --yes @bubblewrap/cli@1.25.0 init \
+          echo "JAVA_HOME=$JAVA_HOME"
+          which java || echo "java not on PATH"
+          # Pipe "n" to Bubblewrap's JDK prompt -> use the JDK we installed (no download, non-interactive).
+          printf 'n\n' | npx --yes @bubblewrap/cli@1.25.0 init \
             --manifest "$PWA_URL" \
             --packageId "$PACKAGE_ID" \
             --appName "KVSR Management" \
