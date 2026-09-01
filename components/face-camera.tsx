@@ -40,12 +40,21 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
+  // Keep latest callbacks in refs so parent re-renders NEVER restart the
+  // camera stream (inline callbacks in effect deps caused the flicker).
+  const onStatusRef = useRef(onStatus);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onStatusRef.current = onStatus;
+    onReadyRef.current = onReady;
+  });
+
   // Load face-api models once.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        onStatus?.("Loading face models…");
+        onStatusRef.current?.("Loading face models…");
         const faceapi = await import("@vladmandic/face-api");
         if (cancelled) return;
         faceapiRef.current = faceapi;
@@ -57,15 +66,15 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Could not load face models.";
         setError(msg);
-        onStatus?.(msg);
+        onStatusRef.current?.(msg);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [onStatus]);
+  }, []);
 
-  // Start/restart the camera whenever the facing mode (or size) changes.
+  // Start/restart the camera ONLY when facing mode or size changes.
   useEffect(() => {
     let cancelled = false;
     setReady(false);
@@ -86,21 +95,21 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
         video.srcObject = stream;
         await video.play();
         setReady(true);
-        onReady?.();
-        onStatus?.(
+        onReadyRef.current?.();
+        onStatusRef.current?.(
           `Camera ready (${facingMode === "user" ? "front" : "back"}) — position faces in frame.`
         );
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Could not start camera.";
         setError(msg);
-        onStatus?.(msg);
+        onStatusRef.current?.(msg);
       }
     })();
     return () => {
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [facingMode, width, height, onStatus, onReady]);
+  }, [facingMode, width, height]);
 
   const switchCamera = () => {
     setFacingMode((m) => (m === "user" ? "environment" : "user"));

@@ -46,7 +46,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4"
       role="presentation"
     >
       {/* Backdrop */}
@@ -55,7 +55,7 @@ export function Modal({
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Dialog */}
+      {/* Dialog — fullscreen bottom sheet on phones, centered dialog on larger screens */}
       <div
         ref={dialogRef}
         role="dialog"
@@ -63,11 +63,11 @@ export function Modal({
         aria-label={title}
         tabIndex={-1}
         className={cn(
-          "relative z-10 w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl focus:outline-none",
+          "relative z-10 w-full max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl sm:max-w-lg sm:max-h-[85vh] bg-white shadow-2xl focus:outline-none",
           className
         )}
       >
-        <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b border-kvsr-soft sticky top-0 bg-white rounded-t-2xl">
+        <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b border-kvsr-soft sticky top-0 bg-white rounded-t-3xl sm:rounded-t-2xl">
           <div>
             <h2 className="text-lg font-semibold text-kvsr-ink">{title}</h2>
             {description && (
