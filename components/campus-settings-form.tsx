@@ -51,15 +51,16 @@ export function CampusSettingsForm({ initial }: CampusSettingsFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Used to verify that attendance is marked from inside campus.
+      <p className="text-sm text-slate-700">
+        Used to verify that attendance is marked from inside campus. Students
+        and faculty outside this radius are blocked from marking attendance.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label
             htmlFor="campus-latitude"
-            className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2"
+            className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2"
           >
             Latitude
           </label>
@@ -72,14 +73,14 @@ export function CampusSettingsForm({ initial }: CampusSettingsFormProps) {
             value={latitude}
             onChange={(e) => setLatitude(e.target.value)}
             required
-            className="w-full border border-kvsr-soft rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+            className="w-full bg-white border border-kvsr-soft rounded-xl px-3 py-2.5 text-sm text-kvsr-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
           />
         </div>
 
         <div>
           <label
             htmlFor="campus-longitude"
-            className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2"
+            className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2"
           >
             Longitude
           </label>
@@ -92,14 +93,14 @@ export function CampusSettingsForm({ initial }: CampusSettingsFormProps) {
             value={longitude}
             onChange={(e) => setLongitude(e.target.value)}
             required
-            className="w-full border border-kvsr-soft rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+            className="w-full bg-white border border-kvsr-soft rounded-xl px-3 py-2.5 text-sm text-kvsr-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
           />
         </div>
 
         <div>
           <label
             htmlFor="campus-radius"
-            className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2"
+            className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2"
           >
             Radius (meters)
           </label>
@@ -112,7 +113,7 @@ export function CampusSettingsForm({ initial }: CampusSettingsFormProps) {
             value={radiusMeters}
             onChange={(e) => setRadiusMeters(e.target.value)}
             required
-            className="w-full border border-kvsr-soft rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
+            className="w-full bg-white border border-kvsr-soft rounded-xl px-3 py-2.5 text-sm text-kvsr-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
           />
         </div>
       </div>

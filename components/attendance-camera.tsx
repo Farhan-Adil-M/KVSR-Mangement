@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, useEffect } from "react";
 import { FaceCamera, type FaceCameraHandle } from "./face-camera";
@@ -39,7 +39,7 @@ export function AttendanceCamera({
   slotLabel: string;
 }) {
   const camRef = useRef<FaceCameraHandle>(null);
-  const [status, setStatus] = useState("Starting camera…");
+  const [status, setStatus] = useState("Starting cameraâ€¦");
   const [ready, setReady] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
@@ -57,7 +57,7 @@ export function AttendanceCamera({
     if (!ready) return;
     let cancelled = false;
     (async () => {
-      setStatus("Fetching enrolled faces…");
+      setStatus("Fetching enrolled facesâ€¦");
       const bioRes = await getSectionBiometrics(sectionId);
       if (cancelled) return;
       if (!bioRes.ok) {
@@ -87,7 +87,7 @@ export function AttendanceCamera({
     if (scanningRef.current) return;
     scanningRef.current = true;
     setScanning(true);
-    setStatus("Live scanning — faces are marked automatically.");
+    setStatus("Live scanning â€” faces are marked automatically.");
     intervalRef.current = setInterval(async () => {
       const descriptors = await camRef.current?.capture();
       if (!descriptors || descriptors.length === 0) {
@@ -121,7 +121,7 @@ export function AttendanceCamera({
       });
       setUnknownCount(unknown);
       setStatus(
-        `Live scanning — ${matched.size} recognized this frame` +
+        `Live scanning â€” ${matched.size} recognized this frame` +
           (unknown > 0 ? `, ${unknown} unknown.` : ".")
       );
     }, SCAN_INTERVAL_MS);
@@ -174,7 +174,7 @@ export function AttendanceCamera({
               "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold " +
               (scanning
                 ? "bg-emerald-100 text-emerald-700"
-                : "bg-slate-100 text-slate-500")
+                : "bg-slate-100 text-slate-700")
             }
           >
             <ScanFace className="w-4 h-4" />
@@ -190,13 +190,13 @@ export function AttendanceCamera({
           {unknownCount > 0 && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
               {unknownCount} detected face{unknownCount !== 1 ? "s" : ""} did not match any
-              enrolled student. They won&apos;t be marked — add them manually below if needed.
+              enrolled student. They won&apos;t be marked â€” add them manually below if needed.
             </div>
           )}
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="w-4 h-4" />
-            Tap to include/exclude · {selected.size} marked present of {students.length}
+            Tap to include/exclude Â· {selected.size} marked present of {students.length}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -224,7 +224,7 @@ export function AttendanceCamera({
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Roll #{s.rollNumber}
-                    {auto && <span className="ml-1 text-kvsr-cta font-semibold">· auto</span>}
+                    {auto && <span className="ml-1 text-kvsr-cta font-semibold">Â· auto</span>}
                   </p>
                 </button>
               );

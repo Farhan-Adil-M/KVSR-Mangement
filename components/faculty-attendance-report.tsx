@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { getFacultyAttendanceReport } from "@/lib/actions/faculty-attendance";
@@ -35,9 +35,9 @@ export function FacultyAttendanceReport({ defaultDate }: { defaultDate?: string 
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <p className="text-sm text-slate-700">Loading...</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-slate-500">No faculty attendance data for this date.</p>
+        <p className="text-sm text-slate-700">No faculty attendance data for this date.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-sm">
@@ -57,7 +57,7 @@ export function FacultyAttendanceReport({ defaultDate }: { defaultDate?: string 
                   <td className="px-4 py-3 text-center text-slate-600">{r.marked}</td>
                   <td className="px-4 py-3">
                     {r.slots.length === 0 ? (
-                      <span className="text-xs text-slate-400">No classes scheduled</span>
+                      <span className="text-xs text-slate-600">No classes scheduled</span>
                     ) : (
                       <ul className="space-y-1">
                         {r.slots.map((s) => (
@@ -68,7 +68,7 @@ export function FacultyAttendanceReport({ defaultDate }: { defaultDate?: string 
                             }`}
                           >
                             P{s.periodNumber} {s.subjectName} ({s.sectionName}){" "}
-                            {s.startTime ? `at ${String(s.startTime).slice(0, 5)}` : ""} —{" "}
+                            {s.startTime ? `at ${String(s.startTime).slice(0, 5)}` : ""} â€”{" "}
                             {s.marked ? "Marked" : "Pending"}
                           </li>
                         ))}

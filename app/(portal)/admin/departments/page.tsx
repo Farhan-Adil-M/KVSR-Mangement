@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -95,7 +95,7 @@ export default function DepartmentsPage() {
     <div className="space-y-6 p-4 lg:p-6">
       <div>
         <h1 className="text-2xl font-bold text-kvsr-navy">Departments</h1>
-        <p className="text-sm text-slate-500">Create departments and assign HODs.</p>
+        <p className="text-sm text-slate-700">Create departments and assign HODs.</p>
       </div>
 
       {message && (
@@ -135,7 +135,7 @@ export default function DepartmentsPage() {
       </form>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading departments...</p>
+        <p className="text-sm text-slate-700">Loading departments...</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-sm">
@@ -165,7 +165,7 @@ export default function DepartmentsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {d.hodName ? <span className="font-medium text-green-600">{d.hodName}</span> : "—"}
+                    {d.hodName ? <span className="font-medium text-green-600">{d.hodName}</span> : "â€”"}
                   </td>
                   <td className="px-4 py-3">
                     <select
@@ -174,7 +174,7 @@ export default function DepartmentsPage() {
                       disabled={isPending}
                       className="w-48 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-orange"
                     >
-                      <option value="">— Select HOD —</option>
+                      <option value="">â€” Select HOD â€”</option>
                       {faculty
                         .filter((f) => f.departmentId === d.id)
                         .map((f) => (

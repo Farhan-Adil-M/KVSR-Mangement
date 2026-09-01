@@ -186,7 +186,7 @@ export function FacultyStudentHub({
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                     hasBio
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-kvsr-navy/[0.06] text-kvsr-muted"
+                      : "bg-kvsr-navy/[0.06] text-slate-700 border border-kvsr-soft"
                   }`}
                 >
                   <Fingerprint className="w-3 h-3" />
@@ -196,7 +196,7 @@ export function FacultyStudentHub({
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                     hasEval
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-kvsr-navy/[0.06] text-kvsr-muted"
+                      : "bg-kvsr-navy/[0.06] text-slate-700 border border-kvsr-soft"
                   }`}
                 >
                   <Star className="w-3 h-3" />
