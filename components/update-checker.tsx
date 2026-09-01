@@ -34,7 +34,8 @@ export function UpdateChecker() {
         const manifest = await res.json();
         const latestCode = Number(manifest.versionCode ?? 0);
 
-        if (latestCode > installedCode && manifest.apkUrl) {
+        // Only prompt when both versions are known and the server is newer.
+        if (installedCode > 0 && latestCode > installedCode && manifest.apkUrl) {
           if (!cancelled) {
             setUpdate({ version: manifest.version ?? "new", apkUrl: manifest.apkUrl });
           }
