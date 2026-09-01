@@ -22,6 +22,8 @@ import {
   Star,
   User,
   Fingerprint,
+  Building2,
+  UserCheck,
   type LucideIcon,
   LogOut,
 } from "lucide-react";
@@ -39,6 +41,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/students", label: "Students", icon: GraduationCap },
   { href: "/admin/faculty", label: "Faculty", icon: Users },
+  { href: "/admin/departments", label: "Departments", icon: Building2 },
   { href: "/admin/timetable", label: "Timetable", icon: Calendar },
   { href: "/admin/attendance/reports", label: "Attendance Reports", icon: ClipboardCheck },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
@@ -55,12 +58,14 @@ const FACULTY_NAV: NavItem[] = [
   { href: "/faculty/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/faculty/marks", label: "Marks Entry", icon: Award },
   { href: "/faculty/evaluations", label: "Evaluations", icon: Star },
+  { href: "/faculty/faculty-attendance", label: "Faculty Attendance", icon: UserCheck },
   { href: "/faculty/notifications", label: "Notifications", icon: Bell },
 ];
 
 const STUDENT_NAV: NavItem[] = [
   { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/student/attendance", label: "My Attendance", icon: ClipboardCheck },
+  { href: "/student/biometrics", label: "My Biometrics", icon: Fingerprint },
   { href: "/student/timetable", label: "My Timetable", icon: Calendar },
   { href: "/student/marks", label: "Marks", icon: Award },
   { href: "/student/assignments", label: "Assignments", icon: ClipboardList },
@@ -72,12 +77,14 @@ const STUDENT_NAV: NavItem[] = [
 
 const NAV_BY_ROLE: Record<SessionUser["role"], NavItem[]> = {
   admin: ADMIN_NAV,
+  hod: FACULTY_NAV,
   faculty: FACULTY_NAV,
   student: STUDENT_NAV,
 };
 
 const ROLE_LABEL: Record<SessionUser["role"], string> = {
-  admin: "HOD / Admin",
+  admin: "Admin",
+  hod: "HOD",
   faculty: "Faculty",
   student: "Student",
 };

@@ -20,12 +20,12 @@ const EXAM_TYPES = ["internal", "assignment", "midterm", "external", "other"] as
 
 type FacultyContext =
   | { error: string; session?: undefined; yearId?: undefined }
-  | { error?: undefined; session: { role: "admin" | "faculty" | "student"; id: string }; yearId: string };
+  | { error?: undefined; session: { role: "admin" | "hod" | "faculty" | "student"; id: string }; yearId: string };
 
 async function facultyContext(): Promise<FacultyContext> {
   const session = await getSession();
   if (!session) return { error: "Not authenticated." as const };
-  if (session.role !== "faculty" && session.role !== "admin") {
+  if (session.role !== "faculty" && session.role !== "hod" && session.role !== "admin") {
     return { error: "Not authorized." as const };
   }
   const yearId = await getCurrentAcademicYearId();
@@ -33,13 +33,13 @@ async function facultyContext(): Promise<FacultyContext> {
   return { session, yearId };
 }
 
-/** Admin bypasses assignment checks; faculty must be assigned to section (+subject when given). */
+/** Admin/HOD bypass assignment checks; faculty must be assigned to section (+subject when given). */
 async function assertAccess(
-  session: { role: "admin" | "faculty" | "student"; id: string },
+  session: { role: "admin" | "hod" | "faculty" | "student"; id: string },
   sectionId: string,
   subjectId?: string
 ) {
-  if (session.role === "admin") return true;
+  if (session.role === "admin" || session.role === "hod") return true;
   return isFacultyAssigned(session.id, sectionId, subjectId);
 }
 
@@ -72,7 +72,7 @@ export async function createAssignment(input: unknown): Promise<ActionResult> {
 
   try {
     await db.insert(assignments).values({
-      facultyId: session.role === "faculty" ? session.id : null,
+      facultyId: session.role === "admin" ? null : session.id,
       subjectId,
       sectionId,
       academicYearId: yearId,
@@ -167,7 +167,7 @@ export async function saveMarks(input: unknown): Promise<ActionResult> {
             marksObtained: String(row.marksObtained),
             maxMarks: String(maxMarks),
             examType,
-            recordedBy: session.role === "faculty" ? session.id : null,
+            recordedBy: session.role === "admin" ? null : session.id,
             updatedAt: new Date(),
           })
           .where(eq(marks.id, existing.id));
@@ -180,7 +180,7 @@ export async function saveMarks(input: unknown): Promise<ActionResult> {
           examType,
           marksObtained: String(row.marksObtained),
           maxMarks: String(maxMarks),
-          recordedBy: session.role === "faculty" ? session.id : null,
+          recordedBy: session.role === "admin" ? null : session.id,
         });
       }
     }
@@ -265,8 +265,8 @@ export async function createSyllabusUnit(input: unknown): Promise<ActionResult> 
   if (!parsed.success) return { success: false as const, error: "Invalid syllabus payload." };
   const { subjectId, unitNumber, title, description } = parsed.data;
 
-  // Faculty must teach this subject somewhere; admin may always edit.
-  if (session.role === "faculty") {
+  // Faculty/HOD must teach this subject somewhere; admin may always edit.
+  if (session.role === "faculty" || session.role === "hod") {
     const yearId = await getCurrentAcademicYearId();
     if (!yearId) return { success: false as const, error: "No active academic year." };
     const { facultyAssignments } = await import("@/lib/db/schema");

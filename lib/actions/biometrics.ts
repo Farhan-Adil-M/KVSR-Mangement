@@ -6,7 +6,11 @@ import { db } from "@/lib/db";
 import { studentBiometrics, studentEnrollments, students } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getSession, type SessionUser } from "@/lib/auth/session";
-import { isFacultyAssigned, getCurrentAcademicYearId } from "@/lib/auth/guards";
+import {
+  isFacultyAssigned,
+  getCurrentAcademicYearId,
+  isStaffRole,
+} from "@/lib/auth/guards";
 
 const descriptorSchema = z
   .array(z.number())
@@ -29,7 +33,7 @@ type AuthResult = { ok: true; session: SessionUser } | { ok: false; error: strin
 async function authorizeSectionAccess(sectionId: string): Promise<AuthResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not authenticated." };
-  if (session.role === "faculty") {
+  if (isStaffRole(session.role) && session.role !== "admin") {
     const assigned = await isFacultyAssigned(session.id, sectionId);
     if (!assigned) return { ok: false, error: "You are not assigned to this class." };
   } else if (session.role !== "admin") {
@@ -41,7 +45,11 @@ async function authorizeSectionAccess(sectionId: string): Promise<AuthResult> {
 export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
   const session = await getSession();
   if (!session) return { success: false, error: "Not authenticated." };
-  if (session.role !== "faculty" && session.role !== "admin")
+  if (
+    session.role !== "faculty" &&
+    session.role !== "hod" &&
+    session.role !== "admin"
+  )
     return { success: false, error: "Not authorized." };
 
   const parsed = enrollSchema.safeParse(input);
@@ -201,5 +209,83 @@ export async function getSectionStudentsForBiometrics(
       rollNumber: s.rollNumber,
       hasBiometric: bioSet.has(s.id),
     })),
+  };
+}
+
+/* ---------------- Student self-enrollment (frozen after first) ---------------- */
+
+const selfEnrollSchema = z.object({
+  studentId: z.string().uuid(),
+  descriptor: descriptorSchema,
+  consent: z.literal(true),
+});
+
+export type SelfEnrollResult = { success: true } | { success: false; error: string };
+
+export async function enrollOwnBiometric(input: unknown): Promise<SelfEnrollResult> {
+  const session = await getSession();
+  if (!session) return { success: false, error: "Not authenticated." };
+  if (session.role !== "student") return { success: false, error: "Not authorized." };
+
+  const parsed = selfEnrollSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid biometric payload." };
+  const { studentId, descriptor } = parsed.data;
+
+  // Students may only enroll their own biometric.
+  if (session.id !== studentId) return { success: false, error: "Not authorized." };
+
+  // Frozen after first enrollment: cannot change or re-enroll on their own.
+  const [existing] = await db
+    .select({ id: studentBiometrics.id })
+    .from(studentBiometrics)
+    .where(eq(studentBiometrics.studentId, studentId))
+    .limit(1);
+  if (existing) {
+    return {
+      success: false,
+      error: "Biometric already enrolled. Contact faculty or HOD to change it.",
+    };
+  }
+
+  try {
+    await db.insert(studentBiometrics).values({
+      studentId,
+      descriptor,
+      enrolledBy: session.id,
+      consentedAt: new Date(),
+      consentVersion: "1.0",
+    });
+    revalidatePath("/student/biometrics");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to enroll own biometric:", error);
+    return { success: false, error: "Failed to save biometric." };
+  }
+}
+
+export type MyBiometricResult =
+  | { ok: true; hasBiometric: boolean; consentedAt: string | null; consentVersion: string | null }
+  | { ok: false; error: string };
+
+export async function getMyBiometric(studentId: string): Promise<MyBiometricResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not authenticated." };
+  if (session.role !== "student") return { ok: false, error: "Not authorized." };
+  if (session.id !== studentId) return { ok: false, error: "Not authorized." };
+
+  const [row] = await db
+    .select({
+      consentedAt: studentBiometrics.consentedAt,
+      consentVersion: studentBiometrics.consentVersion,
+    })
+    .from(studentBiometrics)
+    .where(eq(studentBiometrics.studentId, studentId))
+    .limit(1);
+
+  return {
+    ok: true,
+    hasBiometric: !!row,
+    consentedAt: row?.consentedAt ? row.consentedAt.toISOString() : null,
+    consentVersion: row?.consentVersion ?? null,
   };
 }

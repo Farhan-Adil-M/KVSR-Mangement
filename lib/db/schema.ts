@@ -20,6 +20,26 @@ export const departments = pgTable("departments", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
+// Top-level administrators (distinct from faculty/HOD). Seeded with a default account.
+export const admins = pgTable("admins", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  fullName: text("full_name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// Single-row campus geofence config used to gate attendance to on-campus only.
+export const campusSettings = pgTable("campus_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().default("Main Campus"),
+  latitude: numeric("latitude").notNull(),
+  longitude: numeric("longitude").notNull(),
+  radiusMeters: integer("radius_meters").notNull().default(200),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
   departmentId: uuid("department_id")
@@ -495,6 +515,9 @@ export const notifications = pgTable("notifications", {
     onDelete: "cascade",
   }),
   targetStudentId: uuid("target_student_id").references(() => students.id, {
+    onDelete: "cascade",
+  }),
+  departmentId: uuid("department_id").references(() => departments.id, {
     onDelete: "cascade",
   }),
   title: text("title").notNull(),

@@ -12,7 +12,7 @@ if (!SECRET) {
 export interface SessionUser {
   id: string;
   name: string;
-  role: "admin" | "faculty" | "student";
+  role: "admin" | "hod" | "faculty" | "student";
   /** Unix seconds — session expiry, enforced on every verify. */
   exp: number;
 }

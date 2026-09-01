@@ -2,20 +2,51 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { faculty, students } from "@/lib/db/schema";
+import { faculty, students, admins } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { setSession, clearSession, type SessionUser } from "@/lib/auth/session";
 
 export async function login(
   username: string,
   password: string,
-  role: "faculty" | "student"
+  role: "admin" | "faculty" | "student"
 ): Promise<{ success: false; error: string } | { success: true; user: Omit<SessionUser, "exp"> }> {
   const trimmedUsername = username.trim();
   const trimmedPassword = password.trim();
 
   if (!trimmedUsername || !trimmedPassword) {
     return { success: false, error: "Username and password are required." };
+  }
+
+  if (role === "admin") {
+    const [admin] = await db
+      .select({
+        id: admins.id,
+        fullName: admins.fullName,
+        username: admins.username,
+        passwordHash: admins.passwordHash,
+      })
+      .from(admins)
+      .where(eq(admins.username, trimmedUsername))
+      .limit(1);
+
+    if (!admin || !admin.passwordHash) {
+      return { success: false, error: "Invalid admin username or password." };
+    }
+
+    // Plaintext comparison (consistent with the rest of the app)
+    if (admin.passwordHash !== trimmedPassword) {
+      return { success: false, error: "Invalid admin username or password." };
+    }
+
+    const user: Omit<SessionUser, "exp"> = {
+      id: admin.id,
+      name: admin.fullName,
+      role: "admin",
+    };
+
+    await setSession(user);
+    return { success: true, user };
   }
 
   if (role === "faculty") {
@@ -43,7 +74,7 @@ export async function login(
     const user: Omit<SessionUser, "exp"> = {
       id: member.id,
       name: member.fullName,
-      role: member.isHod ? "admin" : "faculty",
+      role: member.isHod ? "hod" : "faculty",
     };
 
     await setSession(user);

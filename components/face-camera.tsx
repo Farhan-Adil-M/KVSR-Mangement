@@ -23,12 +23,14 @@ interface Props {
   onStatus?: (msg: string) => void;
   width?: number;
   height?: number;
+  fullscreen?: boolean;
+  onReady?: () => void;
 }
 
 const MODEL_URL = "/models";
 
 export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamera(
-  { onStatus, width = 640, height = 480 },
+  { onStatus, width = 640, height = 480, fullscreen, onReady },
   ref
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -84,6 +86,7 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
         video.srcObject = stream;
         await video.play();
         setReady(true);
+        onReady?.();
         onStatus?.(
           `Camera ready (${facingMode === "user" ? "front" : "back"}) — position faces in frame.`
         );
@@ -97,7 +100,7 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
       cancelled = true;
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [facingMode, width, height, onStatus]);
+  }, [facingMode, width, height, onStatus, onReady]);
 
   const switchCamera = () => {
     setFacingMode((m) => (m === "user" ? "environment" : "user"));
@@ -174,11 +177,17 @@ export const FaceCamera = forwardRef<FaceCameraHandle, Props>(function FaceCamer
   }));
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-black aspect-video">
+    <div
+      className={
+        fullscreen
+          ? "absolute inset-0 overflow-hidden bg-black"
+          : "relative overflow-hidden rounded-2xl bg-black aspect-video"
+      }
+    >
       <video
         ref={videoRef}
-        width={width}
-        height={height}
+        width={fullscreen ? undefined : width}
+        height={fullscreen ? undefined : height}
         className="h-full w-full object-cover"
         muted
         playsInline

@@ -11,18 +11,20 @@ if (!SECRET) {
 interface SessionPayload {
   id: string;
   name: string;
-  role: "admin" | "faculty" | "student";
+  role: "admin" | "hod" | "faculty" | "student";
   exp: number;
 }
 
 const ROLE_PREFIX: Record<SessionPayload["role"], string> = {
   admin: "/admin",
+  hod: "/faculty",
   faculty: "/faculty",
   student: "/student",
 };
 
 const ROLE_HOME: Record<SessionPayload["role"], string> = {
   admin: "/admin/dashboard",
+  hod: "/faculty/dashboard",
   faculty: "/faculty/dashboard",
   student: "/student/dashboard",
 };

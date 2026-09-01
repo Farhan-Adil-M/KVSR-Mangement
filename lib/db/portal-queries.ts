@@ -336,7 +336,16 @@ export async function getStudentNotifications(studentId: string) {
     SELECT id, title, body, is_read AS "isRead", created_at AS "createdAt"
     FROM notifications
     WHERE target_student_id = ${studentId}
-       OR (target_role = 'student' AND target_faculty_id IS NULL AND target_student_id IS NULL)
+       OR (target_role = 'student' AND target_faculty_id IS NULL AND target_student_id IS NULL
+           AND (department_id IS NULL
+                OR department_id = (
+                  SELECT p.department_id FROM student_enrollments se
+                  JOIN sections sec ON sec.id = se.section_id
+                  JOIN study_years sy ON sy.id = sec.study_year_id
+                  JOIN programs p ON p.id = sy.program_id
+                  WHERE se.student_id = ${studentId} AND se.is_active = true
+                    AND se.academic_year_id = (SELECT id FROM academic_years WHERE is_current = true)
+                  LIMIT 1)))
     ORDER BY created_at DESC
     LIMIT 50
   `;
@@ -354,7 +363,9 @@ export async function getFacultyNotifications(facultyId: string) {
     SELECT id, title, body, is_read AS "isRead", created_at AS "createdAt"
     FROM notifications
     WHERE target_faculty_id = ${facultyId}
-       OR (target_role = 'faculty' AND target_faculty_id IS NULL AND target_student_id IS NULL)
+       OR (target_role = 'faculty' AND target_faculty_id IS NULL AND target_student_id IS NULL
+           AND (department_id IS NULL
+                OR department_id = (SELECT department_id FROM faculty WHERE id = ${facultyId})))
     ORDER BY created_at DESC
     LIMIT 50
   `;

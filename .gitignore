@@ -39,8 +39,10 @@ public/swe-worker-*.js*
 *.tsbuildinfo
 next-env.d.ts
 
-# Bubblewrap / TWA build artifacts (generated in CI)
-/android/
+# TWA/Bubblewrap keystore secrets (never commit)
 *.keystore
+
+# NOTE: the /android folder is now first-party Capacitor source (custom
+# MainActivity + Manifest for camera/geolocation) and IS committed.
 
 

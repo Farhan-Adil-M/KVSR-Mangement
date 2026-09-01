@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { FaceCamera, type FaceCameraHandle } from "./face-camera";
 import { getSectionBiometrics } from "@/lib/actions/biometrics";
 import { saveAttendance } from "@/lib/actions/attendance";
-import { Loader2, Check, ScanFace, Users } from "lucide-react";
+import { Loader2, Check, Users, ScanFace } from "lucide-react";
 
 interface Student {
   id: string;
@@ -13,6 +13,7 @@ interface Student {
 }
 
 const MATCH_THRESHOLD = 0.5; // face-api euclidean distance; lower = stricter
+const SCAN_INTERVAL_MS = 1500;
 
 function distance(a: number[], b: number[]): number {
   let sum = 0;
@@ -37,7 +38,8 @@ export function AttendanceCamera({
   slotLabel: string;
 }) {
   const camRef = useRef<FaceCameraHandle>(null);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("Starting camera…");
+  const [ready, setReady] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
   const [unknownCount, setUnknownCount] = useState(0);
@@ -45,50 +47,84 @@ export function AttendanceCamera({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const handleScan = async () => {
-    setResult(null);
-    setScanning(true);
-    setStatus("Fetching enrolled faces…");
-    const bioRes = await getSectionBiometrics(sectionId);
-    if (!bioRes.ok) {
-      setStatus(bioRes.error);
-      setScanning(false);
-      return;
-    }
-    setStatus("Detecting faces in frame…");
-    const descriptors = await camRef.current?.capture();
-    if (!descriptors || descriptors.length === 0) {
-      setStatus("No faces detected. Make sure faces are visible and well-lit.");
-      setScanning(false);
-      return;
-    }
+  const bioRef = useRef<{ studentId: string; descriptor: number[] }[]>([]);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanningRef = useRef(false);
 
-    const matched = new Set<string>();
-    let unknown = 0;
-    for (const desc of descriptors) {
-      let bestId: string | null = null;
-      let bestDist = Infinity;
-      for (const b of bioRes.biometrics) {
-        const d = distance(desc, b.descriptor);
-        if (d < bestDist) {
-          bestDist = d;
-          bestId = b.studentId;
-        }
+  // Fetch enrolled biometrics once the camera is ready, then start live scanning.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    (async () => {
+      setStatus("Fetching enrolled faces…");
+      const bioRes = await getSectionBiometrics(sectionId);
+      if (cancelled) return;
+      if (!bioRes.ok) {
+        setStatus(bioRes.error);
+        return;
       }
-      if (bestId && bestDist < MATCH_THRESHOLD) matched.add(bestId);
-      else unknown += 1;
-    }
+      bioRef.current = bioRes.biometrics;
+      startScanning();
+    })();
+    return () => {
+      cancelled = true;
+      stopScanning();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, sectionId]);
 
-    setMatchedIds(matched);
-    setSelected(new Set(matched));
-    setUnknownCount(unknown);
+  function stopScanning() {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    scanningRef.current = false;
     setScanning(false);
-    setStatus(
-      `Recognized ${matched.size} student${matched.size !== 1 ? "s" : ""}` +
-        (unknown > 0 ? `, ${unknown} unknown face${unknown !== 1 ? "s" : ""}.` : ".") +
-        " Review and confirm below."
-    );
-  };
+  }
+
+  function startScanning() {
+    if (scanningRef.current) return;
+    scanningRef.current = true;
+    setScanning(true);
+    setStatus("Live scanning — faces are marked automatically.");
+    intervalRef.current = setInterval(async () => {
+      const descriptors = await camRef.current?.capture();
+      if (!descriptors || descriptors.length === 0) {
+        setStatus("No faces detected. Position students in frame.");
+        return;
+      }
+      const matched = new Set<string>();
+      let unknown = 0;
+      for (const desc of descriptors) {
+        let bestId: string | null = null;
+        let bestDist = Infinity;
+        for (const b of bioRef.current) {
+          const d = distance(desc, b.descriptor);
+          if (d < bestDist) {
+            bestDist = d;
+            bestId = b.studentId;
+          }
+        }
+        if (bestId && bestDist < MATCH_THRESHOLD) matched.add(bestId);
+        else unknown += 1;
+      }
+      setMatchedIds((prev) => {
+        const next = new Set(prev);
+        matched.forEach((id) => next.add(id));
+        return next;
+      });
+      setSelected((prev) => {
+        const next = new Set(prev);
+        matched.forEach((id) => next.add(id));
+        return next;
+      });
+      setUnknownCount(unknown);
+      setStatus(
+        `Live scanning — ${matched.size} recognized this frame` +
+          (unknown > 0 ? `, ${unknown} unknown.` : ".")
+      );
+    }, SCAN_INTERVAL_MS);
+  }
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -100,6 +136,7 @@ export function AttendanceCamera({
   };
 
   const handleSubmit = async () => {
+    stopScanning();
     setSubmitting(true);
     setResult(null);
     const records = students.map((s) => ({
@@ -122,29 +159,31 @@ export function AttendanceCamera({
           <div>
             <h3 className="font-semibold text-kvsr-ink">{slotLabel}</h3>
             <p className="text-xs text-muted-foreground">
-              Camera marks everyone in frame at once. Review before saving.
+              Camera marks everyone in frame automatically. Review before saving.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleScan}
-            disabled={scanning}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-kvsr-navy text-white text-sm font-semibold rounded-xl hover:bg-kvsr-navy/90 disabled:opacity-50 transition-colors"
+          <span
+            className={
+              "inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold " +
+              (scanning
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-slate-100 text-slate-500")
+            }
           >
-            {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanFace className="w-4 h-4" />}
-            {scanning ? "Scanning…" : "Scan Faces"}
-          </button>
+            <ScanFace className="w-4 h-4" />
+            {scanning ? "Live" : "Idle"}
+          </span>
         </div>
-        <FaceCamera ref={camRef} onStatus={setStatus} />
+        <FaceCamera ref={camRef} onStatus={setStatus} onReady={() => setReady(true)} />
         {status && <p className="text-sm text-muted-foreground mt-3">{status}</p>}
       </div>
 
-      {matchedIds.size > 0 || unknownCount > 0 ? (
+      {(matchedIds.size > 0 || unknownCount > 0) && (
         <div className="space-y-4">
           {unknownCount > 0 && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
-              {unknownCount} detected face{unknownCount !== 1 ? "s" : ""} did not match any enrolled
-              student. They won&apos;t be marked — add them manually below if needed.
+              {unknownCount} detected face{unknownCount !== 1 ? "s" : ""} did not match any
+              enrolled student. They won&apos;t be marked — add them manually below if needed.
             </div>
           )}
 
@@ -191,11 +230,15 @@ export function AttendanceCamera({
             disabled={submitting}
             className="inline-flex items-center gap-2 px-5 py-3 bg-kvsr-cta text-white text-sm font-semibold rounded-xl hover:bg-kvsr-cta/90 disabled:opacity-50 transition-colors"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
             Submit Attendance
           </button>
         </div>
-      ) : null}
+      )}
 
       {result && (
         <p

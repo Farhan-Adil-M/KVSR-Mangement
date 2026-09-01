@@ -1,4 +1,4 @@
-name: Build Android APK (TWA)
+name: Build Android APK (Capacitor)
 
 on:
   push:
@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       pwa_url:
-        description: "Deployed PWA URL (must be HTTPS and reachable)"
-        required: true
+        description: "Deployed web app URL (HTTPS) the native shell loads"
+        required: false
+        default: "https://kvsr-mangement-tau.vercel.app"
 
 permissions:
   contents: write # needed to create a GitHub Release and upload the APK
@@ -17,10 +18,13 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     env:
-      PWA_URL: ${{ github.event.inputs.pwa_url || secrets.PWA_URL }}
+      PWA_URL: ${{ github.event.inputs.pwa_url || 'https://kvsr-mangement-tau.vercel.app' }}
       KEYSTORE_PATH: ${{ github.workspace }}/android-key.keystore
       KEY_ALIAS: kvsr
       PACKAGE_ID: com.kvsr.mgmt
+      # Dummy values so `next build` can run in CI without a live database.
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy' }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET || 'ci-dummy-secret' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,6 +46,12 @@ jobs:
       - name: Install Android platform & build-tools
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Verify web build (compile check)
+        run: npm run build
+
       - name: Provide signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -51,59 +61,34 @@ jobs:
           if [ -z "$KEYSTORE_BASE64" ]; then
             echo "::error::KEYSTORE_BASE64 secret is not set. Create a keystore and add it as a repo secret:" >&2
             echo "  keytool -genkeypair -v -keystore android-key.keystore -alias $KEY_ALIAS -keyalg RSA -keysize 2048 -validity 10000" >&2
-            echo "  base64 -w0 android-key.keystore > keystore.b64  # paste into ANDROID_ASSETLINKS/KEYSTORE_BASE64" >&2
+            echo "  base64 -w0 android-key.keystore > keystore.b64  # paste into KEYSTORE_BASE64" >&2
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
 
-      - name: Configure Bubblewrap (JDK + Android SDK paths)
-        shell: bash
+      - name: Sync Capacitor native project
+        run: npx cap sync android
+
+      - name: Build release APK
+        working-directory: android
         run: |
-          mkdir -p ~/.bubblewrap
-          ANDROID_SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          printf '{\n  "jdkPath": "%s",\n  "androidSdkPath": "%s"\n}\n' "$JAVA_HOME" "$ANDROID_SDK" > ~/.bubblewrap/config.json
-          echo "Wrote config with jdkPath=$JAVA_HOME androidSdkPath=$ANDROID_SDK"
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
 
-      - name: Generate Android project from twa-manifest.json (non-interactive)
-        shell: bash
-        run: npx --yes @bubblewrap/cli@1.25.0 update --skipVersionUpgrade
-
-      - name: Build signed APK
-        shell: bash
+      - name: Sign APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_apk
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ env.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
         env:
-          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: npx --yes @bubblewrap/cli@1.25.0 build \
-          --skipPwaValidation \
-          --signingKeyPath "$KEYSTORE_PATH" \
-          --signingKeyAlias "$KEY_ALIAS"
-
-      - name: Compute keystore SHA256 (for assetlinks.json)
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          SHA=$(keytool -list -v -keystore "$KEYSTORE_PATH" -alias "$KEY_ALIAS" \
-            -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" \
-            | grep -i "SHA256:" | sed 's/.*SHA256:\s*//')
-          echo "KEYSTORE_SHA256=$SHA" >> "$GITHUB_ENV"
-          echo "::notice::Add this SHA256 to ANDROID_ASSETLINKS on your host: $SHA"
+          BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: Prepare APK artifact
-        shell: bash
-        run: |
-          echo "--- APK files found under the workspace ---"
-          find "$GITHUB_WORKSPACE" -name "*.apk" -print
-          APK="$(find "$GITHUB_WORKSPACE" -name '*-signed.apk' | head -1)"
-          if [ -z "$APK" ]; then
-            APK="$(find "$GITHUB_WORKSPACE" -name '*.apk' ! -name '*-unsigned*' ! -name '*-aligned*' | head -1)"
-          fi
-          if [ -z "$APK" ]; then
-            echo "::error::No release APK was produced. Check the 'Build signed APK' step log."
-            exit 1
-          fi
-          cp "$APK" "$GITHUB_WORKSPACE/kvsr-management.apk"
-          echo "Prepared $APK -> kvsr-management.apk"
+        run: cp "${{ steps.sign_apk.outputs.signedReleaseFile }}" "$GITHUB_WORKSPACE/kvsr-management.apk"
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2

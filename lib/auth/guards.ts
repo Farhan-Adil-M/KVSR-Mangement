@@ -14,10 +14,17 @@ import { getSession, type SessionUser } from "./session";
 
 export type Role = SessionUser["role"];
 
+/** Faculty, HOD and admin are all "staff" with teaching/management powers. */
+export function isStaffRole(role: Role): boolean {
+  return role === "admin" || role === "hod" || role === "faculty";
+}
+
 export function homeForRole(role: Role): string {
   switch (role) {
     case "admin":
       return "/admin/dashboard";
+    case "hod":
+      return "/faculty/dashboard";
     case "faculty":
       return "/faculty/dashboard";
     case "student":
@@ -41,12 +48,35 @@ export async function requireAdmin() {
   return requireRole("admin");
 }
 
+export async function requireHod() {
+  const session = await requireSession();
+  if (session.role !== "hod" && session.role !== "admin") {
+    redirect(homeForRole(session.role));
+  }
+  return session;
+}
+
 export async function requireFaculty() {
-  return requireRole("faculty");
+  const session = await requireSession();
+  if (session.role !== "faculty" && session.role !== "hod") {
+    redirect(homeForRole(session.role));
+  }
+  return session;
 }
 
 export async function requireStudent() {
   return requireRole("student");
+}
+
+/** Staff (faculty/hod/admin) or a student matching the given id. */
+export async function requireStudentSelfOrStaff(studentId: string) {
+  const session = await requireSession();
+  if (session.role === "student") {
+    if (session.id !== studentId) redirect("/student/dashboard");
+    return session;
+  }
+  if (!isStaffRole(session.role)) redirect(homeForRole(session.role));
+  return session;
 }
 
 export async function getCurrentAcademicYearId(): Promise<string | null> {

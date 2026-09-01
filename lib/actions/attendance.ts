@@ -9,9 +9,10 @@ import {
   timetableSlots,
   studentEnrollments,
 } from "@/lib/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
-import { isFacultyAssigned } from "@/lib/auth/guards";
+import { isFacultyAssigned, isStaffRole } from "@/lib/auth/guards";
+import { isOnCampus } from "@/lib/actions/campus";
 
 const recordSchema = z.object({
   studentId: z.string().uuid(),
@@ -22,6 +23,10 @@ const saveAttendanceSchema = z.object({
   sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   timetableSlotId: z.string().uuid(),
   records: z.array(recordSchema).min(1),
+  // Optional device location, used to enforce on-campus attendance.
+  location: z
+    .object({ lat: z.number(), lng: z.number() })
+    .optional(),
 });
 
 export type SaveAttendanceResult =
@@ -36,7 +41,19 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
   if (!parsed.success) {
     return { success: false, error: "Invalid attendance payload." };
   }
-  const { sessionDate, timetableSlotId, records } = parsed.data;
+  const { sessionDate, timetableSlotId, records, location } = parsed.data;
+
+  // On-campus gate: if the client supplies a location, it must be within the
+  // campus radius. (Admins marking remotely may omit location.)
+  if (location) {
+    const geo = await isOnCampus(location.lat, location.lng);
+    if (!geo.onCampus) {
+      return {
+        success: false,
+        error: `Attendance can only be marked on campus (you are ~${geo.distance}m from campus, limit ${geo.radius}m).`,
+      };
+    }
+  }
 
   // Derive scope from the slot row — never trust client-supplied section/subject.
   const [slot] = await db
@@ -54,9 +71,9 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
 
   if (!slot) return { success: false, error: "Timetable slot not found." };
 
-  // Authorization: faculty must be assigned to the slot's section (and subject);
+  // Authorization: faculty/HOD must be assigned to the slot's section (and subject);
   // admins may mark any class.
-  if (session.role === "faculty") {
+  if (isStaffRole(session.role) && session.role !== "admin") {
     const assigned = await isFacultyAssigned(
       session.id,
       slot.sectionId,
@@ -95,6 +112,9 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
     };
   }
 
+  const recordedById =
+    session.role === "admin" ? null : session.id;
+
   try {
     // neon-http driver does NOT support db.transaction(); resolve the session
     // with sequential queries. Unique indexes (unique_session_slot_day on
@@ -113,36 +133,44 @@ export async function saveAttendance(input: unknown): Promise<SaveAttendanceResu
     let sessionId: string;
     if (existingSession) {
       sessionId = existingSession.id;
-      // Clear prior rows before re-inserting (re-save case).
-      await db
-        .delete(attendanceRecords)
-        .where(eq(attendanceRecords.sessionId, sessionId));
     } else {
       const [newSession] = await db
         .insert(attendanceSessions)
         .values({
           date: sessionDate,
           timetableSlotId,
-          facultyId: session.role === "faculty" ? session.id : slot.facultyId,
+          facultyId: session.role === "admin" ? slot.facultyId : session.id,
           subjectId: slot.subjectId,
           sectionId: slot.sectionId,
           status: "conducted",
           submittedAt: new Date(),
-          submittedBy: session.role === "faculty" ? session.id : null,
+          submittedBy: recordedById,
         })
         .returning({ id: attendanceSessions.id });
       sessionId = newSession.id;
     }
 
-    await db.insert(attendanceRecords).values(
-      uniqueRecords.map((record) => ({
-        sessionId,
-        studentId: record.studentId,
-        status: record.status,
-        recordedBy: session.role === "faculty" ? session.id : null,
-        recordedAt: new Date(),
-      }))
-    );
+    // MERGE: upsert per student so a later camera scan ADDS to existing marks
+    // instead of wiping them. Never deletes other students' records.
+    await db
+      .insert(attendanceRecords)
+      .values(
+        uniqueRecords.map((record) => ({
+          sessionId,
+          studentId: record.studentId,
+          status: record.status,
+          recordedBy: recordedById,
+          recordedAt: new Date(),
+        }))
+      )
+      .onConflictDoUpdate({
+        target: [attendanceRecords.sessionId, attendanceRecords.studentId],
+        set: {
+          status: sql`excluded.status`,
+          recordedBy: recordedById,
+          recordedAt: new Date(),
+        },
+      });
 
     revalidatePath("/faculty/attendance");
     revalidatePath("/faculty/dashboard");
