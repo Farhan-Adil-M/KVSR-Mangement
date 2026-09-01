@@ -7,6 +7,7 @@ import {
   notifications,
   facultyAssignments,
   departments,
+  programs,
   faculty,
 } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
@@ -128,10 +129,37 @@ export async function createDepartment(input: unknown) {
   try {
     await db.insert(departments).values(parsed.data);
     revalidatePath("/admin/departments");
+    revalidatePath("/admin/settings");
     return { success: true as const };
   } catch (error) {
     console.error("Failed to create department:", error);
     return { success: false as const, error: "Failed to create department (code may already exist)." };
+  }
+}
+
+const programSchema = z.object({
+  departmentId: z.string().uuid(),
+  code: z.string().min(1).max(20),
+  name: z.string().min(1).max(120),
+  durationYears: z.number().int().min(1).max(10).default(4),
+});
+
+export async function createProgram(input: unknown) {
+  await requireAdmin();
+  const parsed = programSchema.safeParse(input);
+  if (!parsed.success)
+    return { success: false as const, error: "Invalid program payload." };
+  try {
+    await db.insert(programs).values(parsed.data);
+    revalidatePath("/admin/settings");
+    revalidatePath("/admin/departments");
+    return { success: true as const };
+  } catch (error) {
+    console.error("Failed to create program:", error);
+    return {
+      success: false as const,
+      error: "Failed to create program (code may already exist).",
+    };
   }
 }
 
@@ -151,6 +179,7 @@ export async function updateDepartment(input: unknown) {
       .set({ code: parsed.data.code, name: parsed.data.name })
       .where(eq(departments.id, parsed.data.id));
     revalidatePath("/admin/departments");
+    revalidatePath("/admin/settings");
     return { success: true as const };
   } catch (error) {
     console.error("Failed to update department:", error);
@@ -165,6 +194,7 @@ export async function deleteDepartment(departmentId: string) {
   try {
     await db.delete(departments).where(eq(departments.id, departmentId));
     revalidatePath("/admin/departments");
+    revalidatePath("/admin/settings");
     return { success: true as const };
   } catch (error) {
     console.error("Failed to delete department:", error);
