@@ -1,138 +1,124 @@
 "use client";
 
-import { motion, useInView } from "motion/react";
-import { useRef } from "react";
-import { Calendar, Users, BookOpen, GraduationCap } from "lucide-react";
+import {
+  ScanFace,
+  MapPin,
+  CalendarDays,
+  ClipboardCheck,
+  Fingerprint,
+  Building2,
+  type LucideIcon,
+} from "lucide-react";
+import { Reveal, SectionHeading, SpotlightCard } from "./primitives";
 
 interface Feature {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   title: string;
   description: string;
+  featured?: boolean;
 }
 
-const features: Feature[] = [
+const FEATURES: Feature[] = [
   {
-    icon: Calendar,
-    title: "Smart Timetables",
+    icon: ScanFace,
+    title: "Face-Recognition Attendance",
     description:
-      "Section-wise schedules with faculty, room, and lab assignments updated in real time.",
+      "Students check in by face as they walk in. Attendance is captured in seconds, verified against the roster, and logged — no roll-calls, no proxies.",
+    featured: true,
   },
   {
-    icon: Users,
-    title: "Attendance",
+    icon: MapPin,
+    title: "Geofenced Check-ins",
     description:
-      "Track sessions, view summaries, and spot patterns across sections and subjects.",
+      "Check-in is only accepted inside the campus radius, so “present” always means present.",
   },
   {
-    icon: BookOpen,
-    title: "Faculty Operations",
+    icon: CalendarDays,
+    title: "Live Timetables",
     description:
-      "Manage teaching assignments, workloads, and departmental responsibilities.",
+      "Section-wise schedules with faculty, room and lab assignments, updated in real time.",
   },
   {
-    icon: GraduationCap,
-    title: "Academic Records",
+    icon: ClipboardCheck,
+    title: "Marks & Evaluations",
     description:
-      "Keep student, course, and session data organized and accessible in one place.",
+      "Internal marks and evaluations entered once, published securely to students and parents.",
+  },
+  {
+    icon: Fingerprint,
+    title: "Biometric Enrollment",
+    description:
+      "One-time enrollment that unlocks face check-in for every class after that.",
+  },
+  {
+    icon: Building2,
+    title: "HOD & Department Tools",
+    description:
+      "Faculty workloads, teaching assignments and departmental responsibilities in one view.",
   },
 ];
 
-function FeatureCard({
-  feature,
-  index,
-  featured,
-}: {
-  feature: Feature;
-  index: number;
-  featured: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
-  const Icon = feature.icon;
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 16 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
-      transition={{ duration: 0.5, delay: index * 0.08 }}
-      whileHover={{ y: -3 }}
-      className={`group relative p-6 rounded-2xl border border-white/10 transition-colors duration-300 focus-within:ring-1 focus-within:ring-kvsr-gold/50 ${
-        featured
-          ? "bg-gradient-to-br from-kvsr-cta/20 to-kvsr-cta/5 lg:row-span-2"
-          : "bg-white/[0.03] hover:bg-white/[0.06]"
-      }`}
-    >
-      {featured && (
-        <div className="absolute top-0 left-6 -translate-y-1/2 px-2.5 py-0.5 rounded-full bg-kvsr-gold text-kvsr-deep text-[10px] font-bold uppercase tracking-wide">
-          Featured
-        </div>
-      )}
-      <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
-          featured ? "bg-kvsr-gold/20" : "bg-white/10 group-hover:bg-kvsr-gold/10"
-        } transition-colors`}
-      >
-        <Icon
-          className={`w-5 h-5 ${
-            featured ? "text-kvsr-gold" : "text-white/80"
-          }`}
-        />
-      </div>
-      <h3 className="text-white font-semibold text-lg mb-2">{feature.title}</h3>
-      <p className="text-kvsr-muted text-sm leading-relaxed">
-        {feature.description}
-      </p>
-      {featured && (
-        <div className="mt-5 pt-5 border-t border-white/10">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-white/5">
-              <div className="text-lg font-semibold text-white">6</div>
-              <div className="text-xs text-kvsr-muted">Days / week</div>
-            </div>
-            <div className="p-3 rounded-xl bg-white/5">
-              <div className="text-lg font-semibold text-white">13</div>
-              <div className="text-xs text-kvsr-muted">Sections</div>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-kvsr-gold/0 to-transparent group-hover:via-kvsr-gold/60 transition-all duration-300 rounded-b-2xl" />
-    </motion.div>
-  );
-}
-
 export function FeatureGrid() {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   return (
-    <section className="py-20 sm:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <motion.div
-          ref={ref}
-          initial={{ opacity: 0, y: 12 }}
-          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-          transition={{ duration: 0.5 }}
-          className="mb-10 sm:mb-12"
-        >
-          <p className="text-xs font-medium text-kvsr-gold uppercase tracking-[0.15em] mb-3">
-            Capabilities
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-semibold text-white">
-            Everything campus operations needs
-          </h2>
-        </motion.div>
+    <section id="features" className="scroll-mt-16 bg-kvsr-paper py-20 sm:py-24 lg:py-28">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Reveal>
+          <SectionHeading
+            eyebrow="Capabilities"
+            title="Everything a campus runs on, in one platform."
+          />
+        </Reveal>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((feature, index) => (
-            <FeatureCard
-              key={feature.title}
-              feature={feature}
-              index={index}
-              featured={index === 0}
-            />
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {FEATURES.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <Reveal key={feature.title} delay={index * 0.06}>
+                <SpotlightCard
+                  className={
+                    feature.featured
+                      ? "lg:col-span-2 lg:row-span-2 h-full"
+                      : "h-full"
+                  }
+                >
+                  <article
+                    className={`flex flex-col h-full p-6 sm:p-7 ${
+                      feature.featured ? "lg:p-10" : ""
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5 ${
+                        feature.featured
+                          ? "bg-kvsr-navy text-kvsr-gold"
+                          : "bg-kvsr-navy/[0.06] text-kvsr-navy"
+                      }`}
+                    >
+                      <Icon
+                        size={feature.featured ? 24 : 22}
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <h3
+                      className={`font-semibold text-kvsr-ink ${
+                        feature.featured
+                          ? "font-display text-2xl lg:text-3xl"
+                          : "text-lg"
+                      } mb-2`}
+                    >
+                      {feature.title}
+                    </h3>
+                    <p
+                      className={`text-slate-700 leading-relaxed ${
+                        feature.featured ? "text-base lg:text-lg" : "text-sm"
+                      }`}
+                    >
+                      {feature.description}
+                    </p>
+                  </article>
+                </SpotlightCard>
+              </Reveal>
+            );
+          })}
         </div>
       </div>
     </section>

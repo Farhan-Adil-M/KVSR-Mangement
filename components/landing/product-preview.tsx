@@ -61,12 +61,12 @@ export function ProductPreview() {
               <p className="text-[11px] text-kvsr-muted uppercase tracking-[0.12em] font-medium">
                 Today&apos;s Overview
               </p>
-              <h3 className="text-base font-semibold text-kvsr-ink mt-0.5">
+              <p className="text-base font-semibold text-kvsr-ink mt-0.5">
                 II-A Timetable
-              </h3>
+              </p>
             </div>
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
               Live
             </div>
           </div>
