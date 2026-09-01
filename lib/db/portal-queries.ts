@@ -99,6 +99,49 @@ export async function getFacultyStudents(facultyId: string) {
   }[];
 }
 
+/** All sections in a department — used for the HOD class filter. */
+export async function getDepartmentSections(departmentId: string) {
+  const rows = await rawSql`
+    SELECT sec.id, sec.name AS section, sy.label AS "yearLabel"
+    FROM departments d
+    JOIN programs p ON p.department_id = d.id
+    JOIN study_years sy ON sy.program_id = p.id
+    JOIN sections sec ON sec.study_year_id = sy.id
+    WHERE d.id = ${departmentId}
+    ORDER BY sy.label, sec.name
+  `;
+  return (rows as unknown as { id: string; section: string; yearLabel: string }[]).map(
+    (r) => ({ id: r.id, label: `${r.yearLabel}-${r.section}` })
+  );
+}
+
+/** Every student in a department (HOD view), across all its sections. */
+export async function getDepartmentStudents(departmentId: string) {
+  const rows = await rawSql`
+    SELECT st.id, st.roll_number AS "rollNumber", st.full_name AS "fullName",
+           sec.id AS "sectionId", sec.name AS section, sy.label AS year
+    FROM departments d
+    JOIN programs p ON p.department_id = d.id
+    JOIN study_years sy ON sy.program_id = p.id
+    JOIN sections sec ON sec.study_year_id = sy.id
+    JOIN student_enrollments se ON se.section_id = sec.id
+      AND se.academic_year_id = (SELECT id FROM academic_years WHERE is_current = true)
+      AND se.is_active = true
+    JOIN students st ON se.student_id = st.id
+    WHERE d.id = ${departmentId}
+    GROUP BY st.id, st.roll_number, st.full_name, sec.id, sec.name, sy.label
+    ORDER BY sy.label, sec.name, st.roll_number
+  `;
+  return rows as unknown as {
+    id: string;
+    rollNumber: string;
+    fullName: string;
+    sectionId: string;
+    section: string;
+    year: string;
+  }[];
+}
+
 /** All evaluations by this faculty for one section, in a single round-trip. */
 export async function getFacultySectionEvaluations(
   facultyId: string,

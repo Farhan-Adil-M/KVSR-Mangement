@@ -9,7 +9,7 @@ import { getSession, type SessionUser } from "@/lib/auth/session";
 import {
   isFacultyAssigned,
   getCurrentAcademicYearId,
-  isStaffRole,
+  isSectionInHodDepartment,
 } from "@/lib/auth/guards";
 
 const descriptorSchema = z
@@ -33,13 +33,19 @@ type AuthResult = { ok: true; session: SessionUser } | { ok: false; error: strin
 async function authorizeSectionAccess(sectionId: string): Promise<AuthResult> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not authenticated." };
-  if (isStaffRole(session.role) && session.role !== "admin") {
+  if (session.role === "admin") return { ok: true, session };
+  if (session.role === "faculty") {
     const assigned = await isFacultyAssigned(session.id, sectionId);
     if (!assigned) return { ok: false, error: "You are not assigned to this class." };
-  } else if (session.role !== "admin") {
-    return { ok: false, error: "Not authorized." };
+    return { ok: true, session };
   }
-  return { ok: true, session };
+  if (session.role === "hod") {
+    // HOD may access any class within their own department.
+    const inDept = await isSectionInHodDepartment(session.id, sectionId);
+    if (!inDept) return { ok: false, error: "This class is outside your department." };
+    return { ok: true, session };
+  }
+  return { ok: false, error: "Not authorized." };
 }
 
 export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
@@ -56,8 +62,9 @@ export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
   if (!parsed.success) return { success: false, error: "Invalid biometric payload." };
   const { studentId, descriptor } = parsed.data;
 
-  // Faculty must be assigned to the student's section (any subject).
-  if (session.role === "faculty") {
+  // Faculty must be assigned to the student's section; HOD must own the
+  // student's department.
+  if (session.role === "faculty" || session.role === "hod") {
     const yearId = await getCurrentAcademicYearId();
     if (!yearId) return { success: false, error: "No active academic year." };
     const [enr] = await db
@@ -72,9 +79,15 @@ export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
       )
       .limit(1);
     if (!enr) return { success: false, error: "Student is not enrolled." };
-    const assigned = await isFacultyAssigned(session.id, enr.sectionId);
-    if (!assigned)
-      return { success: false, error: "You are not assigned to this student's class." };
+    if (session.role === "faculty") {
+      const assigned = await isFacultyAssigned(session.id, enr.sectionId);
+      if (!assigned)
+        return { success: false, error: "You are not assigned to this student's class." };
+    } else {
+      const inDept = await isSectionInHodDepartment(session.id, enr.sectionId);
+      if (!inDept)
+        return { success: false, error: "This student is outside your department." };
+    }
   }
 
   try {
@@ -97,7 +110,7 @@ export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
           updatedAt: new Date(),
         },
       });
-    revalidatePath("/faculty/biometrics");
+    revalidatePath("/faculty/students");
     return { success: true };
   } catch (error) {
     console.error("Failed to enroll biometric:", error);

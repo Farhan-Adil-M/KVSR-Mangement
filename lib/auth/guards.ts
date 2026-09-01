@@ -8,6 +8,8 @@ import {
   academicYears,
   subjects,
   students,
+  faculty,
+  programs,
 } from "@/lib/db/schema";
 import { and, eq, asc } from "drizzle-orm";
 import { getSession, type SessionUser } from "./session";
@@ -142,6 +144,32 @@ export async function isFacultyAssigned(
     .limit(1);
 
   return !!row;
+}
+
+/**
+ * Backend authorization check: is this section within the HOD's department?
+ * (sections → study_years → programs → departments)
+ */
+export async function isSectionInHodDepartment(
+  hodId: string,
+  sectionId: string
+): Promise<boolean> {
+  const [me] = await db
+    .select({ departmentId: faculty.departmentId })
+    .from(faculty)
+    .where(eq(faculty.id, hodId))
+    .limit(1);
+  if (!me?.departmentId) return false;
+
+  const [row] = await db
+    .select({ departmentId: programs.departmentId })
+    .from(sections)
+    .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
+    .innerJoin(programs, eq(studyYears.programId, programs.id))
+    .where(eq(sections.id, sectionId))
+    .limit(1);
+
+  return !!row && row.departmentId === me.departmentId;
 }
 
 export interface StudentContext {

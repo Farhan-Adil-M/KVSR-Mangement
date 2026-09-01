@@ -262,13 +262,13 @@ export async function getDepartmentsWithHod(): Promise<DepartmentWithHod[]> {
 
 const deptNotificationSchema = z.object({
   departmentId: z.string().uuid(),
-  audience: z.enum(["students", "faculty"]),
+  audience: z.enum(["students", "faculty", "both"]),
   title: z.string().min(1).max(200),
   body: z.string().min(1).max(2000),
 });
 
 /**
- * HOD sends a notification to everyone in their department (students or faculty).
+ * HOD sends a notification to everyone in their department (students, faculty, or both).
  * Scoped by department_id so only that department's members receive it.
  */
 export async function createDepartmentNotification(input: unknown) {
@@ -289,12 +289,24 @@ export async function createDepartmentNotification(input: unknown) {
   }
 
   try {
-    await db.insert(notifications).values({
-      departmentId,
-      targetRole: audience === "students" ? "student" : "faculty",
-      title,
-      body,
-    });
+    if (audience === "both") {
+      // "both" inserts two rows (student + faculty) sharing title/body/department.
+      await db.insert(notifications).values(
+        (["student", "faculty"] as const).map((targetRole) => ({
+          departmentId,
+          targetRole,
+          title,
+          body,
+        }))
+      );
+    } else {
+      await db.insert(notifications).values({
+        departmentId,
+        targetRole: audience === "students" ? "student" : "faculty",
+        title,
+        body,
+      });
+    }
     revalidatePath("/faculty/notifications");
     revalidatePath("/student/notifications");
     return { success: true as const };

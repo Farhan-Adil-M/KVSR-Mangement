@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function HodNotificationComposer({ departmentId, departmentName }: Props) {
-  const [audience, setAudience] = useState<"students" | "faculty">("students");
+  const [audience, setAudience] = useState<"students" | "faculty" | "both">("students");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -28,7 +28,13 @@ export function HodNotificationComposer({ departmentId, departmentName }: Props)
       if (res.success) {
         setTitle("");
         setBody("");
-        setMessage("Notification sent to " + departmentName + ".");
+        setMessage(
+          "Notification sent to " +
+            departmentName +
+            " (" +
+            (audience === "both" ? "students & faculty" : audience) +
+            ")."
+        );
       } else {
         setMessage(res.error);
       }
@@ -44,11 +50,11 @@ export function HodNotificationComposer({ departmentId, departmentName }: Props)
         Notify {departmentName}
       </h2>
       <p className="text-sm text-muted-foreground">
-        Send a message to your department students or faculty.
+        Send a message to your department students, faculty, or both.
       </p>
 
       <div className="mt-4 flex gap-2">
-        {(["students", "faculty"] as const).map((a) => (
+        {(["students", "faculty", "both"] as const).map((a) => (
           <button
             key={a}
             type="button"

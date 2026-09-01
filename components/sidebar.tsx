@@ -19,7 +19,6 @@ import {
   FileText,
   Award,
   ClipboardList,
-  Star,
   User,
   Fingerprint,
   Building2,
@@ -56,7 +55,6 @@ const FACULTY_NAV: NavItem[] = [
   { href: "/faculty/students", label: "My Students", icon: Users },
   { href: "/faculty/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/faculty/marks", label: "Marks Entry", icon: Award },
-  { href: "/faculty/evaluations", label: "Evaluations", icon: Star },
   { href: "/faculty/faculty-attendance", label: "Faculty Attendance", icon: UserCheck },
   { href: "/faculty/notifications", label: "Notifications", icon: Bell },
 ];

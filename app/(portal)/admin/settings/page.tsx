@@ -12,13 +12,15 @@ import {
   getPeriods,
   getDashboardStats,
 } from "@/lib/db/queries";
+import { getCampusSettings } from "@/lib/actions/campus";
+import { CampusSettingsForm } from "@/components/campus-settings-form";
 import {
   Calendar,
   Building2,
   GraduationCap,
   Clock,
   Database,
-  Info,
+  MapPin,
 } from "lucide-react";
 
 export const metadata = {
@@ -27,11 +29,12 @@ export const metadata = {
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const [config, departmentsData, periods, stats] = await Promise.all([
+  const [config, departmentsData, periods, stats, campus] = await Promise.all([
     getSystemConfig(),
     getDepartmentsWithPrograms(),
     getPeriods(),
     getDashboardStats(),
+    getCampusSettings(),
   ]);
 
   // Group programs by department
@@ -79,15 +82,42 @@ export default async function SettingsPage() {
           subtitle="System configuration and academic information"
         />
 
-        {/* Info banner */}
-        <div className="mb-6 p-4 rounded-xl bg-kvsr-navy/[0.04] border border-kvsr-soft flex items-start gap-3">
-          <Info className="w-5 h-5 text-kvsr-cta shrink-0 mt-0.5" />
-          <p className="text-sm text-muted-foreground">
-            Settings are currently read-only in development mode. Editable
-            configuration will be enabled once authentication and role-based
-            access are implemented.
-          </p>
-        </div>
+        {/* Campus location (geofence) */}
+        <Card className="border border-kvsr-soft/80 bg-white shadow-sm mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg text-kvsr-navy flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-kvsr-orange" />
+              Campus Location (Geofence)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {campus ? (
+              <CampusSettingsForm
+                initial={{
+                  latitude: campus.latitude,
+                  longitude: campus.longitude,
+                  radiusMeters: campus.radiusMeters,
+                  name: campus.name,
+                }}
+              />
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  No campus configured. Set the coordinates below to enable
+                  on-campus attendance.
+                </p>
+                <CampusSettingsForm
+                  initial={{
+                    latitude: 0,
+                    longitude: 0,
+                    radiusMeters: 200,
+                    name: null,
+                  }}
+                />
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Academic year */}

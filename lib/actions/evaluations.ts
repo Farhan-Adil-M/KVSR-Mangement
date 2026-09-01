@@ -6,7 +6,11 @@ import { db } from "@/lib/db";
 import { studentEvaluations, studentEnrollments } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
-import { isFacultyAssigned, getCurrentAcademicYearId } from "@/lib/auth/guards";
+import {
+  isFacultyAssigned,
+  isSectionInHodDepartment,
+  getCurrentAcademicYearId,
+} from "@/lib/auth/guards";
 
 const rating = z.number().int().min(1).max(5);
 
@@ -27,7 +31,8 @@ export async function saveEvaluation(input: unknown): Promise<SaveEvaluationResu
   const session = await getSession();
   if (!session) return { success: false, error: "Not authenticated." };
   // Evaluations are faculty-only (admins view analytics, they do not evaluate).
-  if (session.role !== "faculty") {
+  // HODs may evaluate students anywhere in their own department.
+  if (session.role !== "faculty" && session.role !== "hod") {
     return { success: false, error: "Only faculty can evaluate students." };
   }
 
@@ -38,10 +43,17 @@ export async function saveEvaluation(input: unknown): Promise<SaveEvaluationResu
   const { studentId, sectionId, academicPerformance, behaviour, participation, comments } =
     parsed.data;
 
-  // Authorization chain: faculty → assignment → section → student.
-  const assigned = await isFacultyAssigned(session.id, sectionId);
-  if (!assigned) {
-    return { success: false, error: "You are not assigned to this class." };
+  // Authorization: faculty → assigned to the section; HOD → section in their department.
+  if (session.role === "faculty") {
+    const assigned = await isFacultyAssigned(session.id, sectionId);
+    if (!assigned) {
+      return { success: false, error: "You are not assigned to this class." };
+    }
+  } else {
+    const inDept = await isSectionInHodDepartment(session.id, sectionId);
+    if (!inDept) {
+      return { success: false, error: "This class is outside your department." };
+    }
   }
 
   const yearId = await getCurrentAcademicYearId();
@@ -103,7 +115,7 @@ export async function saveEvaluation(input: unknown): Promise<SaveEvaluationResu
       });
     }
 
-    revalidatePath("/faculty/evaluations");
+    revalidatePath("/faculty/students");
     revalidatePath("/admin/students");
     return { success: true };
   } catch (error) {

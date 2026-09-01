@@ -1,14 +1,21 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
-import { FacultyStudentsTabs } from "@/components/faculty-students-tabs";
-import { getFacultyStudents } from "@/lib/db/portal-queries";
+import { FacultyStudentHub } from "@/components/faculty-student-hub";
+import {
+  getDepartmentSections,
+  getDepartmentStudents,
+  getFacultySectionEvaluations,
+  getFacultyStudents,
+} from "@/lib/db/portal-queries";
 import { getFacultyAssignments, requireFaculty } from "@/lib/auth/guards";
-import { Search, Users, Mail, Phone, X } from "lucide-react";
+import { getSectionBiometrics } from "@/lib/actions/biometrics";
+import { Search, Users, X } from "lucide-react";
 import { db } from "@/lib/db";
-import { students as studentsTable } from "@/lib/db/schema";
-import { inArray } from "drizzle-orm";
+import { faculty as facultyTable, students as studentsTable } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 export const metadata = { title: "My Students | KVSR Management" };
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: { section?: string; q?: string };
@@ -16,35 +23,63 @@ interface PageProps {
 
 export default async function FacultyStudentsPage({ searchParams }: PageProps) {
   const session = await requireFaculty();
+  const isHod = session.role === "hod";
 
-  const [myStudents, assignments] = await Promise.all([
-    getFacultyStudents(session.id),
-    getFacultyAssignments(session.id),
-  ]);
+  // Sections this user can filter by: HOD sees every section in their
+  // department, faculty see only the sections they are assigned to.
+  let sectionsList: { id: string; label: string }[] = [];
+  let students: {
+    id: string;
+    rollNumber: string;
+    fullName: string;
+    sectionId: string;
+    section: string;
+    year: string;
+  }[] = [];
 
-  // Only sections the faculty is assigned to are selectable.
-  const mySections = Array.from(
-    new Map(
-      assignments.map((a) => [
-        a.sectionId,
-        { id: a.sectionId, label: `${a.yearLabel}-${a.sectionName}` },
-      ])
-    ).values()
-  );
+  if (isHod) {
+    const [facultyRow] = await db
+      .select({ departmentId: facultyTable.departmentId })
+      .from(facultyTable)
+      .where(eq(facultyTable.id, session.id))
+      .limit(1);
+    const departmentId = facultyRow?.departmentId ?? null;
+    if (departmentId) {
+      [sectionsList, students] = await Promise.all([
+        getDepartmentSections(departmentId),
+        getDepartmentStudents(departmentId),
+      ]);
+    }
+  } else {
+    const [assignments, myStudents] = await Promise.all([
+      getFacultyAssignments(session.id),
+      getFacultyStudents(session.id),
+    ]);
+    sectionsList = Array.from(
+      new Map(
+        assignments.map((a) => [
+          a.sectionId,
+          { id: a.sectionId, label: `${a.yearLabel}-${a.sectionName}` },
+        ])
+      ).values()
+    );
+    students = myStudents;
+  }
 
-  const selectedSection = searchParams.section;
-  const validSection =
-    selectedSection && mySections.some((s) => s.id === selectedSection)
-      ? selectedSection
+  const selectedSection =
+    searchParams.section && sectionsList.some((s) => s.id === searchParams.section)
+      ? searchParams.section
       : null;
 
-  const q = (searchParams.q ?? "").trim().toLowerCase();
-  let visible = validSection
-    ? myStudents.filter((s) => s.sectionId === validSection)
-    : myStudents;
+  const rawQ = searchParams.q ?? "";
+  const q = rawQ.trim().toLowerCase();
+  let visible = selectedSection
+    ? students.filter((s) => s.sectionId === selectedSection)
+    : students;
   if (q) {
     visible = visible.filter(
-      (s) => s.fullName.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
+      (s) =>
+        s.fullName.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q)
     );
   }
 
@@ -62,15 +97,60 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
       : [];
   const contactMap = new Map(contact.map((c) => [c.id, c]));
 
+  const hubStudents = visible.map((s) => ({
+    id: s.id,
+    fullName: s.fullName,
+    rollNumber: s.rollNumber,
+    year: s.year,
+    section: s.section,
+    sectionId: s.sectionId,
+    email: contactMap.get(s.id)?.email ?? null,
+    phone: contactMap.get(s.id)?.phone ?? null,
+  }));
+
+  // For the SELECTED section only: biometric enrollment status + evaluations.
+  let biometricEnrolledIds: string[] = [];
+  let evaluations: Record<
+    string,
+    {
+      academicPerformance: number;
+      behaviour: number;
+      participation: number;
+      comments: string | null;
+    }
+  > = {};
+  if (selectedSection) {
+    const [bioResult, evaluationRows] = await Promise.all([
+      getSectionBiometrics(selectedSection),
+      getFacultySectionEvaluations(session.id, selectedSection),
+    ]);
+    if (bioResult.ok) {
+      biometricEnrolledIds = bioResult.biometrics.map((b) => b.studentId);
+    }
+    evaluations = Object.fromEntries(
+      evaluationRows.map((e) => [
+        e.studentId,
+        {
+          academicPerformance: e.academicPerformance,
+          behaviour: e.behaviour,
+          participation: e.participation,
+          comments: e.comments,
+        },
+      ])
+    );
+  }
+
   return (
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader
           title="My Students"
-          subtitle="Students in the classes you teach"
+          subtitle={
+            isHod
+              ? "You are the HOD — showing every student across your department"
+              : "Students in the classes you teach"
+          }
         />
-
-        <FacultyStudentsTabs active="directory" />
 
         {/* Class filter */}
         <div className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm mb-6 space-y-4">
@@ -80,25 +160,25 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
             </p>
             <div className="flex flex-wrap gap-2">
               <a
-                href={q ? `/faculty/students?q=${encodeURIComponent(q)}` : "/faculty/students"}
+                href={rawQ ? `/faculty/students?q=${encodeURIComponent(rawQ)}` : "/faculty/students"}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  !validSection
+                  !selectedSection
                     ? "bg-kvsr-navy text-white shadow-md"
                     : "bg-kvsr-navy/[0.03] text-kvsr-ink border border-kvsr-soft hover:border-kvsr-navy/30"
                 }`}
               >
-                All my classes
+                {isHod ? "All sections" : "All my classes"}
               </a>
-              {mySections.map((s) => {
+              {sectionsList.map((s) => {
                 const sp = new URLSearchParams();
-                if (q) sp.set("q", q);
+                if (rawQ) sp.set("q", rawQ);
                 sp.set("section", s.id);
                 return (
                   <a
                     key={s.id}
                     href={`/faculty/students?${sp.toString()}`}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                      validSection === s.id
+                      selectedSection === s.id
                         ? "bg-kvsr-navy text-white shadow-md"
                         : "bg-kvsr-navy/[0.03] text-kvsr-ink border border-kvsr-soft hover:border-kvsr-navy/30"
                     }`}
@@ -112,13 +192,13 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
 
           {/* Search */}
           <form action="/faculty/students" method="GET" className="flex flex-col sm:flex-row gap-2">
-            {validSection && <input type="hidden" name="section" value={validSection} />}
+            {selectedSection && <input type="hidden" name="section" value={selectedSection} />}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-kvsr-muted" />
               <input
                 type="text"
                 name="q"
-                defaultValue={searchParams.q ?? ""}
+                defaultValue={rawQ}
                 placeholder="Search by name or roll number…"
                 aria-label="Search students"
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-kvsr-soft text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
@@ -130,7 +210,7 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
             >
               Search
             </button>
-            {(searchParams.q || validSection) && (
+            {(rawQ || selectedSection) && (
               <a
                 href="/faculty/students"
                 className="px-4 py-2.5 border border-kvsr-soft rounded-xl text-sm font-medium text-muted-foreground hover:bg-kvsr-navy/[0.03] transition-colors flex items-center justify-center gap-2"
@@ -142,73 +222,33 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
           </form>
         </div>
 
-        {visible.length === 0 ? (
+        {selectedSection && visible.length === 0 ? (
           <EmptyState
             icon={Users}
-            title={q ? `No students match “${searchParams.q}”` : "No students found"}
+            title={q ? `No students match “${rawQ}”` : "No students found"}
             description={
               q
                 ? "Try a different name or roll number, or clear the search."
+                : "No active students are enrolled in this section."
+            }
+          />
+        ) : students.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No students found"
+            description={
+              isHod
+                ? "No students are enrolled in your department yet."
                 : "You have no assigned classes yet, or no students are enrolled."
             }
           />
         ) : (
-          <>
-            <p className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-              <Users className="w-4 h-4" />
-              {visible.length} student{visible.length !== 1 ? "s" : ""}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {visible.map((s) => {
-                const c = contactMap.get(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <h3 className="font-semibold text-kvsr-ink leading-tight">
-                          {s.fullName}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Roll #{s.rollNumber}
-                        </p>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-kvsr-navy/[0.06] text-kvsr-navy text-xs font-semibold whitespace-nowrap">
-                        {s.year}-{s.section}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 pt-3 border-t border-kvsr-soft">
-                      {c?.email && (
-                        <a
-                          href={`mailto:${c.email}`}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
-                        >
-                          <Mail className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{c.email}</span>
-                        </a>
-                      )}
-                      {c?.phone && (
-                        <a
-                          href={`tel:${c.phone}`}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
-                        >
-                          <Phone className="w-3.5 h-3.5 shrink-0" />
-                          <span>{c.phone}</span>
-                        </a>
-                      )}
-                      {!c?.email && !c?.phone && (
-                        <p className="text-sm text-muted-foreground italic">
-                          No contact info
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+          <FacultyStudentHub
+            students={hubStudents}
+            sectionId={selectedSection}
+            biometricEnrolledIds={biometricEnrolledIds}
+            evaluations={evaluations}
+          />
         )}
       </div>
     </div>
