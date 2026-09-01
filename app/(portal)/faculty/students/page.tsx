@@ -1,5 +1,6 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
+import { FacultyStudentsTabs } from "@/components/faculty-students-tabs";
 import { getFacultyStudents } from "@/lib/db/portal-queries";
 import { getFacultyAssignments, requireFaculty } from "@/lib/auth/guards";
 import { Search, Users, Mail, Phone, X } from "lucide-react";
@@ -68,6 +69,8 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
           title="My Students"
           subtitle="Students in the classes you teach"
         />
+
+        <FacultyStudentsTabs active="directory" />
 
         {/* Class filter */}
         <div className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm mb-6 space-y-4">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { Check, X, Save, Users, Clock, BookOpen, CircleDashed, Search } from "lucide-react";
 import { saveAttendance } from "@/lib/actions/attendance";
+import { getDeviceLocation } from "@/lib/geolocation";
 
 interface Student {
   id: string;
@@ -68,10 +69,12 @@ export function AttendanceGrid({
     setIsPending(true);
     void (async () => {
       try {
+        const location = await getDeviceLocation();
         const result = await saveAttendance({
           sessionDate,
           timetableSlotId: slot.id,
           records: payload,
+          ...(location ? { location } : {}),
         });
         setMessage(
           result.success

@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { FaceCamera, type FaceCameraHandle } from "./face-camera";
 import { getSectionBiometrics } from "@/lib/actions/biometrics";
 import { saveAttendance } from "@/lib/actions/attendance";
+import { getDeviceLocation } from "@/lib/geolocation";
 import { Loader2, Check, Users, ScanFace } from "lucide-react";
 
 interface Student {
@@ -143,7 +144,13 @@ export function AttendanceCamera({
       studentId: s.id,
       status: selected.has(s.id) ? ("present" as const) : ("absent" as const),
     }));
-    const res = await saveAttendance({ sessionDate, timetableSlotId, records });
+    const location = await getDeviceLocation();
+    const res = await saveAttendance({
+      sessionDate,
+      timetableSlotId,
+      records,
+      ...(location ? { location } : {}),
+    });
     setSubmitting(false);
     setResult(
       res.success

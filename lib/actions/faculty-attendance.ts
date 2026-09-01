@@ -52,7 +52,11 @@ export async function getFacultyAttendanceReport(
   date: string
 ): Promise<FacultyAttendanceRow[]> {
   const session = await getSession();
-  if (!session || (session.role !== "admin" && session.role !== "hod")) return [];
+  if (
+    !session ||
+    (session.role !== "admin" && session.role !== "hod" && session.role !== "faculty")
+  )
+    return [];
 
   const yearId = await getCurrentAcademicYearId();
   if (!yearId) return [];
@@ -78,6 +82,9 @@ export async function getFacultyAttendanceReport(
     if (me?.departmentId) {
       facultyRows = facultyRows.filter((f) => f.departmentId === me.departmentId);
     }
+  } else if (session.role === "faculty") {
+    // A regular faculty member only sees their own derived attendance.
+    facultyRows = facultyRows.filter((f) => f.id === session.id);
   }
 
   if (facultyRows.length === 0) return [];

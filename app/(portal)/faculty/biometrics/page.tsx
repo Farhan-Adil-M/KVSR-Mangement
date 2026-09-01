@@ -1,5 +1,6 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
+import { FacultyStudentsTabs } from "@/components/faculty-students-tabs";
 import { BiometricEnrollList } from "@/components/biometric-enroll-list";
 import { getFacultyAssignments, requireFaculty } from "@/lib/auth/guards";
 import { getSectionStudentsForBiometrics } from "@/lib/actions/biometrics";
@@ -41,6 +42,8 @@ export default async function FacultyBiometricsPage({ searchParams }: PageProps)
           title="Biometric Enrollment"
           subtitle="Capture a student's face so attendance can be marked by camera. Only assigned classes are shown."
         />
+
+        <FacultyStudentsTabs active="biometrics" />
 
         <div className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm mb-6">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">

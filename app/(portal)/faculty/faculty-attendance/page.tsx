@@ -1,4 +1,4 @@
-import { requireHod } from "@/lib/auth/guards";
+import { requireFaculty } from "@/lib/auth/guards";
 import { FacultyAttendanceReport } from "@/components/faculty-attendance-report";
 
 export const metadata = {
@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 export default async function HodFacultyAttendancePage() {
-  await requireHod();
+  await requireFaculty();
   return (
     <div className="space-y-6 p-4 lg:p-6">
       <div>
