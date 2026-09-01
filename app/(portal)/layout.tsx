@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { UpdateChecker } from "@/components/update-checker";
 import { requireSession } from "@/lib/auth/guards";
 
 export default async function PortalLayout({
@@ -15,6 +16,7 @@ export default async function PortalLayout({
       <main className="lg:ml-72 min-h-screen bg-muted/30 overflow-auto pt-14 lg:pt-0">
         {children}
       </main>
+      <UpdateChecker />
     </div>
   );
 }
