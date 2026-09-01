@@ -5,11 +5,6 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      pwa_url:
-        description: "Deployed web app URL (HTTPS) the native shell loads"
-        required: false
-        default: "https://kvsr-mangement-tau.vercel.app"
 
 permissions:
   contents: write # needed to create a GitHub Release and upload the APK
@@ -18,7 +13,6 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     env:
-      PWA_URL: ${{ github.event.inputs.pwa_url || 'https://kvsr-mangement-tau.vercel.app' }}
       KEYSTORE_PATH: ${{ github.workspace }}/android-key.keystore
       KEY_ALIAS: kvsr
       PACKAGE_ID: com.kvsr.mgmt
@@ -43,8 +37,16 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
       - name: Install Android platform & build-tools
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Point Gradle at the Android SDK
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          cat android/local.properties
 
       - name: Install web dependencies
         run: npm install
@@ -73,7 +75,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
