@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes
-  if (pathname === "/" || pathname === "/login") {
+  if (pathname === "/" || pathname === "/identify") {
     return NextResponse.next();
   }
 
@@ -84,7 +84,7 @@ export async function middleware(request: NextRequest) {
     const session = sessionCookie ? await verifySession(sessionCookie) : null;
 
     if (!session) {
-      const loginUrl = new URL("/login", request.url);
+      const loginUrl = new URL("/identify", request.url);
       return NextResponse.redirect(loginUrl);
     }
 

@@ -26,7 +26,7 @@ export function SiteHeader() {
           </span>
         </Link>
         <Link
-          href="/login"
+          href="/identify"
           className="px-4 sm:px-5 py-2.5 bg-kvsr-cta text-white text-sm font-medium rounded-full hover:bg-kvsr-cta/90 transition-colors flex items-center gap-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold focus-visible:ring-offset-2 focus-visible:ring-offset-kvsr-deep min-h-[44px]"
         >
           <span className="hidden sm:inline">Open Dashboard</span>

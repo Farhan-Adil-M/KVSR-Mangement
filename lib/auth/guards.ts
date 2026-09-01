@@ -34,7 +34,7 @@ export function homeForRole(role: Role): string {
 
 export async function requireSession(): Promise<SessionUser> {
   const session = await getSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/identify");
   return session;
 }
 

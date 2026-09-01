@@ -57,7 +57,7 @@ export function HeroSection() {
             className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-10"
           >
             <Link
-              href="/login"
+              href="/identify"
               className="group px-6 py-3 bg-kvsr-cta text-white font-medium rounded-full hover:bg-kvsr-cta/90 transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold focus-visible:ring-offset-2 focus-visible:ring-offset-kvsr-deep min-h-[44px]"
             >
               Open Dashboard
@@ -67,7 +67,7 @@ export function HeroSection() {
               />
             </Link>
             <Link
-              href="/login"
+              href="/identify"
               className="px-6 py-3 text-white/80 font-medium hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold/50 rounded-full min-h-[44px]"
             >
               View Timetable →

@@ -109,5 +109,5 @@ export async function login(
 
 export async function logout() {
   await clearSession();
-  redirect("/login");
+  redirect("/identify");
 }
