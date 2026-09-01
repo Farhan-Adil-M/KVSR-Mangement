@@ -9,7 +9,7 @@ import {
   ClipboardCheck,
   UserCheck,
   Bell,
-  Fingerprint,
+  Calendar,
   Award,
   type LucideIcon,
 } from "lucide-react";
@@ -46,7 +46,7 @@ const NAV_BY_ROLE: Record<SessionUser["role"], NavItem[]> = {
   student: [
     { href: "/student/dashboard", label: "Home", icon: LayoutDashboard },
     { href: "/student/attendance", label: "Attendance", icon: ClipboardCheck },
-    { href: "/student/biometrics", label: "Face ID", icon: Fingerprint },
+    { href: "/student/timetable", label: "Timetable", icon: Calendar },
     { href: "/student/marks", label: "Marks", icon: Award },
     { href: "/student/notifications", label: "Alerts", icon: Bell },
   ],

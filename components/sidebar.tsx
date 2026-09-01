@@ -148,7 +148,7 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 w-72 bg-kvsr-navy text-white flex flex-col h-screen shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out lg:translate-x-0",
+          "fixed top-0 left-0 z-[70] w-72 bg-kvsr-navy text-white flex flex-col h-screen shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -195,7 +195,7 @@ export function Sidebar({ user }: SidebarProps) {
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="px-4 py-3 rounded-xl bg-white/5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-lg bg-kvsr-orange/20 flex items-center justify-center shrink-0">
