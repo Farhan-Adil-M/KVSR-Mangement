@@ -5,13 +5,21 @@ import { useRouter } from "next/navigation";
 import { FaceCamera, type FaceCameraHandle } from "@/components/face-camera";
 import { identifyByFace, loginByIdentified } from "@/lib/actions/identify";
 import { login } from "@/lib/actions/auth";
-import { User, GraduationCap, BookOpen, Lock, ScanFace } from "lucide-react";
+import {
+  User,
+  GraduationCap,
+  BookOpen,
+  Lock,
+  ScanFace,
+  X,
+} from "lucide-react";
 
 const SCAN_INTERVAL_MS = 1500;
 
 export default function IdentifyPage() {
   const router = useRouter();
   const camRef = useRef<FaceCameraHandle>(null);
+  const [showFace, setShowFace] = useState(false);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Starting camera…");
   const [matched, setMatched] = useState<string | null>(null);
@@ -24,13 +32,11 @@ export default function IdentifyPage() {
   const [fbError, setFbError] = useState<string | null>(null);
   const [fbLoading, setFbLoading] = useState(false);
 
-  const scanningRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!ready || matched) return;
+    if (!showFace || !ready || matched) return;
     let cancelled = false;
-    scanningRef.current = true;
     setStatus("Looking for your face…");
     intervalRef.current = setInterval(async () => {
       if (cancelled || matched) return;
@@ -44,7 +50,6 @@ export default function IdentifyPage() {
       if (result.ok) {
         setMatched(result.user.name);
         setStatus("Welcome " + result.user.name + " — signing you in…");
-        scanningRef.current = false;
         if (intervalRef.current) clearInterval(intervalRef.current);
         await loginByIdentified(result.user);
       } else {
@@ -55,10 +60,16 @@ export default function IdentifyPage() {
     return () => {
       cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
-      scanningRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, matched]);
+  }, [showFace, ready, matched]);
+
+  function closeFace() {
+    setShowFace(false);
+    setReady(false);
+    setMatched(null);
+    setStatus("Starting camera…");
+  }
 
   async function handleFallback(e: React.FormEvent) {
     e.preventDefault();
@@ -85,34 +96,31 @@ export default function IdentifyPage() {
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-semibold text-white">KVSR Management</h1>
-          <p className="text-sm text-kvsr-muted mt-1">
-            {matched ? "Signed in" : "Look at the camera to sign in"}
-          </p>
+          <p className="text-sm text-kvsr-muted mt-1">Choose how to sign in</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
-          <div className="relative overflow-hidden rounded-xl bg-black aspect-video mb-4">
-            <FaceCamera ref={camRef} onStatus={setStatus} onReady={() => setReady(true)} />
-            <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/50 text-white text-xs font-semibold backdrop-blur-sm">
-              <ScanFace className="w-4 h-4" />
-              {ready ? "Scanning" : "Starting"}
-            </div>
-          </div>
+        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowFace(true)}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-kvsr-cta text-white font-medium rounded-xl hover:bg-kvsr-cta/90 transition-colors"
+          >
+            <ScanFace className="w-5 h-5" />
+            Sign in with Face
+          </button>
 
-          <p className="text-center text-sm text-muted-foreground">{status}</p>
-
-          <div className="mt-4 text-center">
+          <div className="text-center">
             <button
               type="button"
               onClick={() => setShowFallback((s) => !s)}
               className="text-sm text-kvsr-cta hover:underline"
             >
-              {showFallback ? "Use face camera instead" : "Sign in with username & password"}
+              {showFallback ? "Hide credentials" : "Sign in with username & password"}
             </button>
           </div>
 
           {showFallback && (
-            <form onSubmit={handleFallback} className="mt-4 space-y-4">
+            <form onSubmit={handleFallback} className="space-y-4 border-t border-kvsr-soft pt-4">
               <div className="grid grid-cols-3 gap-2 p-1 bg-kvsr-navy/[0.04] rounded-xl">
                 {(["admin", "faculty", "student"] as const).map((r) => (
                   <button
@@ -180,6 +188,37 @@ export default function IdentifyPage() {
           )}
         </div>
       </div>
+
+      {showFace && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black">
+          <FaceCamera ref={camRef} onStatus={setStatus} onReady={() => setReady(true)} />
+
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between p-6">
+            <div className="w-full flex items-center justify-between">
+              <div className="rounded-xl bg-black/60 px-5 py-3 text-center text-white backdrop-blur-sm">
+                <p className="text-base font-semibold">
+                  {matched ? "Signed in" : "Sign in with Face"}
+                </p>
+                <p className="text-sm text-white/80">{status}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeFace}
+                aria-label="Close"
+                className="pointer-events-auto rounded-full bg-black/60 p-2 text-white backdrop-blur-sm hover:bg-black/80"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!matched && (
+              <div className="rounded-full bg-white/10 px-5 py-2 text-sm text-white/90 backdrop-blur-sm">
+                Position your face in frame
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
