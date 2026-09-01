@@ -1,7 +1,7 @@
 package com.kvsr.mgmt;
 
 import com.getcapacitor.BridgeActivity;
-import com.getcapacitor.BridgeWebView;
+import com.getcapacitor.CapWebView;
 
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -16,7 +16,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
 
-        BridgeWebView webView = getBridge().getWebView();
+        CapWebView webView = getBridge().getWebView();
         if (webView == null) return;
 
         // Enable geolocation in the WebView (used by navigator.geolocation).
