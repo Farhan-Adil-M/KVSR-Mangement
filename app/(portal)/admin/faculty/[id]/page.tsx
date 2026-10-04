@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getFacultyList, getFacultySchedule } from "@/lib/db/queries";
 import { getFacultyAssignments, requireAdmin } from "@/lib/auth/guards";
+import { getAppConfig } from "@/lib/app-config";
 import { AssignmentManager } from "@/components/assignment-manager";
 import { db } from "@/lib/db";
 import { subjects, sections, studyYears } from "@/lib/db/schema";
@@ -9,11 +10,12 @@ import { eq, asc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Mail, Phone, Calendar, Clock, ArrowLeft } from "lucide-react";
 
-export const metadata = {
-  title: "Faculty Profile | KVSR Management",
-};
-
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `Faculty Profile | ${config.institutionShortName} Management`,
+  };
+}
 
 interface FacultyDetailPageProps {
   params: { id: string };
@@ -31,7 +33,7 @@ export default async function FacultyDetailPage({
     notFound();
   }
 
-  const [schedule, assignments, subjectRows, sectionRows] = await Promise.all([
+  const [schedule, assignments, subjectRows, sectionRows, config] = await Promise.all([
     getFacultySchedule(member.id),
     getFacultyAssignments(member.id),
     db
@@ -47,9 +49,10 @@ export default async function FacultyDetailPage({
       .from(sections)
       .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
       .orderBy(asc(studyYears.yearNumber), asc(sections.name)),
+    getAppConfig(),
   ]);
 
-  const scheduleByDay = DAYS.map((day) => ({
+  const scheduleByDay = config.teachingDays.map((day) => ({
     day,
     slots: schedule.filter((s) => s.dayOfWeek === day),
   }));
@@ -67,7 +70,7 @@ export default async function FacultyDetailPage({
 
         <DashboardHeader
           title={member.fullName}
-          subtitle={member.department || "KVSRIT Faculty"}
+          subtitle={member.department || `${config.institutionShortName} Faculty`}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

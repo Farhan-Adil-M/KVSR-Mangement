@@ -2,6 +2,7 @@ import { TimetableGrid } from "@/components/timetable-grid";
 import { getSections, getTimetableForSection } from "@/lib/db/queries";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { requireAdmin } from "@/lib/auth/guards";
+import { getAppConfig } from "@/lib/app-config";
 
 export const metadata = {
   title: "Timetable | KVSR Management",
@@ -15,7 +16,7 @@ export default async function TimetablePage({
   searchParams,
 }: TimetablePageProps) {
   await requireAdmin();
-  const sections = await getSections();
+  const [sections, config] = await Promise.all([getSections(), getAppConfig()]);
   const selectedSectionId = searchParams.section || sections[0]?.id;
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
 
@@ -47,6 +48,7 @@ export default async function TimetablePage({
             sectionName={sectionName}
             sections={sections}
             selectedSectionId={selectedSectionId}
+            teachingDays={config.teachingDays}
           />
         )}
       </div>

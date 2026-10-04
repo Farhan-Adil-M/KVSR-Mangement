@@ -11,7 +11,12 @@ const TRUST_CHIPS = [
   { icon: BellRing, label: "Real-time notifications" },
 ];
 
-export function HeroSection() {
+interface HeroSectionProps {
+  institutionName: string;
+  institutionShortName: string;
+}
+
+export function HeroSection({ institutionName, institutionShortName }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden bg-kvsr-deep">
       {/* Background texture + glows */}
@@ -37,7 +42,7 @@ export function HeroSection() {
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6">
                 <span className="w-1.5 h-1.5 rounded-full bg-kvsr-gold" />
                 <span className="text-[11px] sm:text-xs font-medium text-slate-300 tracking-[0.15em] uppercase">
-                  KVSRIT · Kurnool — Operations Platform
+                  {institutionShortName} · Kurnool — Operations Platform
                 </span>
               </span>
             </Reveal>
@@ -56,8 +61,8 @@ export function HeroSection() {
               <p className="text-base sm:text-lg text-slate-300 leading-[1.65] max-w-xl mt-5">
                 Face-recognition attendance with geofenced check-ins, live
                 timetables, marks and evaluations, biometric enrollment and
-                department tools — built for the students, faculty and HODs of
-                Dr. K.V. Subba Reddy Institute of Technology.
+                department tools — built for the students, faculty and HODs of{" "}
+                {institutionName}.
               </p>
             </Reveal>
 
@@ -98,7 +103,7 @@ export function HeroSection() {
           {/* Product preview */}
           <div className="lg:col-span-5 order-2 flex flex-col items-center lg:items-end">
             <Reveal delay={0.2} className="w-full max-w-sm lg:max-w-none">
-              <ProductPreview />
+              <ProductPreview institutionShortName={institutionShortName} />
             </Reveal>
           </div>
         </div>

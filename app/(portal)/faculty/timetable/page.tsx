@@ -2,16 +2,18 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { getFacultyTimetable } from "@/lib/db/portal-queries";
 import { requireFaculty } from "@/lib/auth/guards";
+import { getAppConfig } from "@/lib/app-config";
 import { Calendar } from "lucide-react";
 
 export const metadata = { title: "My Timetable | KVSR Management" };
 export const dynamic = "force-dynamic";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 export default async function FacultyTimetablePage() {
   const session = await requireFaculty();
-  const slots = await getFacultyTimetable(session.id);
+  const [slots, config] = await Promise.all([
+    getFacultyTimetable(session.id),
+    getAppConfig(),
+  ]);
 
   return (
     <div className="p-6 sm:p-8">
@@ -29,7 +31,7 @@ export default async function FacultyTimetablePage() {
           />
         ) : (
           <div className="space-y-5">
-            {DAYS.map((day) => {
+            {config.teachingDays.map((day) => {
               const daySlots = slots.filter((s) => s.dayOfWeek === day);
               if (daySlots.length === 0) return null;
               return (

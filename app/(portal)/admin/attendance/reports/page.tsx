@@ -2,6 +2,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { requireAdmin } from "@/lib/auth/guards";
 import { AttendanceReport } from "@/components/attendance-report";
 import { getSections, getAttendanceReportBySection } from "@/lib/db/queries";
+import { getAppConfig } from "@/lib/app-config";
 
 export const metadata = {
   title: "Attendance Reports | KVSR Management",
@@ -15,7 +16,7 @@ export default async function AttendanceReportsPage({
   searchParams,
 }: AttendanceReportsPageProps) {
   await requireAdmin();
-  const sections = await getSections();
+  const [sections, config] = await Promise.all([getSections(), getAppConfig()]);
   const selectedSectionId = searchParams.section || sections[0]?.id;
 
   const report = selectedSectionId
@@ -41,6 +42,8 @@ export default async function AttendanceReportsPage({
             report={report}
             sections={sections}
             selectedSectionId={selectedSectionId}
+            goodPct={config.attendanceGoodPct}
+            warnPct={config.attendanceWarnPct}
           />
         )}
       </div>

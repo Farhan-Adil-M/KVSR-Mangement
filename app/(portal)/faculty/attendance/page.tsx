@@ -1,8 +1,10 @@
-import { DashboardHeader } from "@/components/dashboard-header";
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { AttendanceMarking } from "@/components/attendance-marking";
+import { SelfCheckinControls } from "@/components/self-checkin-controls";
 import { getFacultyDaySlots } from "@/lib/db/portal-queries";
 import { requireFaculty } from "@/lib/auth/guards";
+import { getAppConfig } from "@/lib/app-config";
 import {
   getStudentsBySection,
   getAttendanceSessionForSlot,
@@ -11,10 +13,13 @@ import {
 import { ClipboardCheck } from "lucide-react";
 import { getCollegeNow } from "@/lib/utils";
 
-export const metadata = { title: "Attendance | KVSR Management" };
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `Attendance | ${config.institutionShortName} Management`,
+  };
+}
 export const dynamic = "force-dynamic";
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface PageProps {
   searchParams: { day?: string; slot?: string };
@@ -25,7 +30,11 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
 
   const collegeNow = getCollegeNow();
   const today = collegeNow.dayName;
-  const day = searchParams.day && searchParams.day !== "Sunday" ? searchParams.day : today;
+  const config = await getAppConfig();
+  const day =
+    searchParams.day && config.teachingDays.includes(searchParams.day)
+      ? searchParams.day
+      : today;
   const selectedSlotId = searchParams.slot;
 
   // Only the faculty's OWN slots are ever returned here.
@@ -34,25 +43,46 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
 
   let students: { id: string; rollNumber: string; fullName: string }[] = [];
   let existingRecords: { studentId: string; status: "present" | "absent" }[] = [];
+  let selfCheckinOpenedAt: string | null = null;
 
   if (selectedSlot) {
-    students = await getStudentsBySection(selectedSlot.sectionId);
-    const existingSession = await getAttendanceSessionForSlot(selectedSlot.id, collegeNow.date);
-    if (existingSession) {
-      const records = await getAttendanceRecordsForSession(existingSession.id);
-      existingRecords = records.map((r) => ({
-        studentId: r.studentId,
-        status: r.status as "present" | "absent",
-      }));
-    }
+    const [roster, sessionData] = await Promise.all([
+      getStudentsBySection(selectedSlot.sectionId),
+      (async () => {
+        const existingSession = await getAttendanceSessionForSlot(
+          selectedSlot.id,
+          collegeNow.date
+        );
+        if (!existingSession) {
+          return { existingRecords: [], selfCheckinOpenedAt: null as string | null };
+        }
+        const records = await getAttendanceRecordsForSession(existingSession.id);
+        return {
+          existingRecords: records.map((r) => ({
+            studentId: r.studentId,
+            status: r.status as "present" | "absent",
+          })),
+          selfCheckinOpenedAt: existingSession.selfCheckinOpenedAt
+            ? existingSession.selfCheckinOpenedAt.toISOString()
+            : null,
+        };
+      })(),
+    ]);
+    students = roster;
+    existingRecords = sessionData.existingRecords;
+    selfCheckinOpenedAt = sessionData.selfCheckinOpenedAt;
   }
 
   return (
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader
+        <PageHeader
           title="Attendance"
           subtitle="Mark attendance for your assigned classes"
+          breadcrumbs={[
+            { label: "Faculty", href: "/faculty/dashboard" },
+            { label: "Attendance" },
+          ]}
         />
 
         {/* Day picker */}
@@ -61,7 +91,7 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
             Day
           </p>
           <div className="flex flex-wrap gap-2">
-            {DAY_NAMES.filter((d) => d !== "Sunday").map((d) => (
+            {config.teachingDays.map((d) => (
               <a
                 key={d}
                 href={`/faculty/attendance?day=${d}`}
@@ -109,23 +139,36 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
         {/* Marking grid */}
         {selectedSlot ? (
           students.length > 0 ? (
-            <AttendanceMarking
-              students={students}
-              slot={{
-                id: selectedSlot.id,
-                periodNumber: selectedSlot.periodNumber,
-                startTime: selectedSlot.startTime,
-                endTime: selectedSlot.endTime,
-                subject: selectedSlot.subject,
-                subjectId: selectedSlot.subjectId,
-                faculty: session.name,
-                isLab: selectedSlot.isLab,
-              }}
-              sectionId={selectedSlot.sectionId}
-              sessionDate={collegeNow.date}
-              existingRecords={existingRecords}
-              slotLabel={`P${selectedSlot.periodNumber} · ${selectedSlot.subject} · ${selectedSlot.year}-${selectedSlot.section}`}
-            />
+            <div className="space-y-6">
+              <SelfCheckinControls
+                timetableSlotId={selectedSlot.id}
+                sessionDate={collegeNow.date}
+                selfCheckinOpenedAt={selfCheckinOpenedAt}
+                selfCheckinWindowMinutes={config.selfCheckinWindowMinutes}
+              />
+              <AttendanceMarking
+                students={students}
+                slot={{
+                  id: selectedSlot.id,
+                  periodNumber: selectedSlot.periodNumber,
+                  startTime: selectedSlot.startTime,
+                  endTime: selectedSlot.endTime,
+                  subject: selectedSlot.subject,
+                  subjectId: selectedSlot.subjectId,
+                  faculty: session.name,
+                  isLab: selectedSlot.isLab,
+                }}
+                sectionId={selectedSlot.sectionId}
+                sessionDate={collegeNow.date}
+                existingRecords={existingRecords}
+                slotLabel={`P${selectedSlot.periodNumber} · ${selectedSlot.subject} · ${selectedSlot.year}-${selectedSlot.section}`}
+                matchThreshold={config.matchThreshold}
+                scanIntervalMs={config.scanIntervalMs}
+                confusionBand={config.confusionBand}
+                photoMin={config.photoMin}
+                photoMax={config.photoMax}
+              />
+            </div>
           ) : (
             <EmptyState
               icon={ClipboardCheck}

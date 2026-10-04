@@ -1,17 +1,32 @@
-import { DashboardHeader } from "@/components/dashboard-header";
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { SelfCheckinCard } from "@/components/self-checkin-card";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import { getStudentAttendance } from "@/lib/db/portal-queries";
-import { ClipboardCheck, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { getAppConfig } from "@/lib/app-config";
+import { getOpenSelfCheckinForSection } from "@/lib/db/queries";
+import { CheckCircle2, AlertTriangle, XCircle, ClipboardCheck } from "lucide-react";
+import { getCollegeNow } from "@/lib/utils";
 
-export const metadata = { title: "My Attendance | KVSR Management" };
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `My Attendance | ${config.institutionShortName} Management`,
+  };
+}
 
-function statusFor(pct: number) {
-  if (pct >= 75)
+function statusFor(pct: number, goodPct: number, warnPct: number) {
+  if (pct >= goodPct)
     return { label: "Safe", icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-  if (pct >= 60)
+  if (pct >= warnPct)
     return { label: "Warning", icon: AlertTriangle, className: "bg-amber-50 text-amber-700 border-amber-200" };
   return { label: "Critical", icon: XCircle, className: "bg-red-50 text-red-700 border-red-200" };
+}
+
+function barColorFor(pct: number, goodPct: number, warnPct: number) {
+  if (pct >= goodPct) return "bg-emerald-500";
+  if (pct >= warnPct) return "bg-amber-500";
+  return "bg-red-500";
 }
 
 export default async function StudentAttendancePage() {
@@ -22,7 +37,10 @@ export default async function StudentAttendancePage() {
     return (
       <div className="p-6 sm:p-8">
         <div className="max-w-7xl mx-auto">
-          <DashboardHeader title="My Attendance" />
+          <PageHeader
+            title="My Attendance"
+            breadcrumbs={[{ label: "Student", href: "/student/dashboard" }, { label: "My Attendance" }]}
+          />
           <EmptyState
             icon={ClipboardCheck}
             title="No active enrollment"
@@ -33,17 +51,39 @@ export default async function StudentAttendancePage() {
     );
   }
 
-  const attendance = await getStudentAttendance(session.id, ctx.sectionId);
+  const collegeNow = getCollegeNow();
+  const [attendance, config, openCheckin] = await Promise.all([
+    getStudentAttendance(session.id, ctx.sectionId),
+    getAppConfig(),
+    getOpenSelfCheckinForSection(ctx.sectionId, collegeNow.date),
+  ]);
 
-  const overall = statusFor(attendance.overallPercentage);
+  const overall = statusFor(
+    attendance.overallPercentage,
+    config.attendanceGoodPct,
+    config.attendanceWarnPct
+  );
 
   return (
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader
+        <PageHeader
           title="My Attendance"
           subtitle={`${ctx.yearLabel}-${ctx.sectionName} · Roll #${ctx.rollNumber}`}
+          breadcrumbs={[{ label: "Student", href: "/student/dashboard" }, { label: "My Attendance" }]}
         />
+
+        {openCheckin && (
+          <div className="mb-6">
+            <SelfCheckinCard
+              timetableSlotId={openCheckin.slotId}
+              subject={openCheckin.subject}
+              periodLabel={`${openCheckin.startTime.slice(0, 5)}–${openCheckin.endTime.slice(0, 5)}`}
+              openedAt={openCheckin.selfCheckinOpenedAt}
+              windowMinutes={config.selfCheckinWindowMinutes}
+            />
+          </div>
+        )}
 
         {/* Overall */}
         <div className="p-6 rounded-2xl bg-white border border-kvsr-soft shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -78,7 +118,11 @@ export default async function StudentAttendancePage() {
         ) : (
           <div className="space-y-3">
             {attendance.subjects.map((s) => {
-              const status = statusFor(s.percentage);
+              const status = statusFor(
+                s.percentage,
+                config.attendanceGoodPct,
+                config.attendanceWarnPct
+              );
               return (
                 <div
                   key={s.subjectId}
@@ -100,13 +144,11 @@ export default async function StudentAttendancePage() {
                       aria-label={`${s.subject} attendance ${s.percentage}%`}
                     >
                       <div
-                        className={`h-full rounded-full ${
-                          s.percentage >= 75
-                            ? "bg-emerald-500"
-                            : s.percentage >= 60
-                            ? "bg-amber-500"
-                            : "bg-red-500"
-                        }`}
+                        className={`h-full rounded-full ${barColorFor(
+                          s.percentage,
+                          config.attendanceGoodPct,
+                          config.attendanceWarnPct
+                        )}`}
                         style={{ width: `${s.percentage}%` }}
                       />
                     </div>

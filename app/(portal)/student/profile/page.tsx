@@ -1,13 +1,20 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
+import { StudentContactEditor } from "@/components/student-contact-editor";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { students } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { getAppConfig } from "@/lib/app-config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Mail, Phone, GraduationCap } from "lucide-react";
+import { GraduationCap, IdCard, User } from "lucide-react";
 
-export const metadata = { title: "My Profile | KVSR Management" };
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `My Profile | ${config.institutionShortName} Management`,
+  };
+}
 
 export default async function StudentProfilePage() {
   const session = await requireStudent();
@@ -19,10 +26,23 @@ export default async function StudentProfilePage() {
       rollNumber: students.rollNumber,
       email: students.email,
       phone: students.phone,
+      contactLockedAt: students.contactLockedAt,
     })
     .from(students)
     .where(eq(students.id, session.id))
     .limit(1);
+
+  const contactLockedAt = profile?.contactLockedAt
+    ? profile.contactLockedAt.toISOString()
+    : null;
+  const contactLockedOn = profile?.contactLockedAt
+    ? new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(profile.contactLockedAt)
+    : null;
 
   return (
     <div className="p-6 sm:p-8">
@@ -32,7 +52,7 @@ export default async function StudentProfilePage() {
         {!profile ? (
           <EmptyState icon={User} title="Profile not found" />
         ) : (
-          <div className="max-w-xl">
+          <div className="max-w-xl space-y-6">
             <Card className="border border-kvsr-soft/80 bg-white shadow-sm">
               <CardHeader className="pb-4 pt-6 px-6">
                 <div className="flex items-center gap-4">
@@ -61,18 +81,23 @@ export default async function StudentProfilePage() {
                   <GraduationCap className="w-4 h-4" />
                   Roll Number: {profile.rollNumber}
                 </div>
-                {profile.email && (
-                  <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                    <Mail className="w-4 h-4" />
-                    {profile.email}
-                  </div>
-                )}
-                {profile.phone && (
-                  <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                    <Phone className="w-4 h-4" />
-                    {profile.phone}
-                  </div>
-                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-kvsr-soft/80 bg-white shadow-sm">
+              <CardHeader className="pb-3 pt-6 px-6">
+                <CardTitle className="text-lg text-kvsr-navy flex items-center gap-2">
+                  <IdCard className="w-5 h-5 text-kvsr-cta" />
+                  Contact Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-6 pb-6">
+                <StudentContactEditor
+                  phone={profile.phone}
+                  email={profile.email}
+                  contactLockedAt={contactLockedAt}
+                  contactLockedOn={contactLockedOn}
+                />
               </CardContent>
             </Card>
           </div>

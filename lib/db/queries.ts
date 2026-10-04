@@ -1,4 +1,4 @@
-import { db } from "./index";
+import { db, rawSql } from "./index";
 import {
   timetableSlots,
   sections,
@@ -15,7 +15,8 @@ import {
   studentAttendanceSummaries,
   departments,
 } from "./schema";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { getAppConfig } from "@/lib/app-config";
 
 export type TimetableSlotWithDetails = {
   id: string;
@@ -396,4 +397,147 @@ export async function getAttendanceReportBySection(sectionId: string) {
       )
     )
     .orderBy(asc(students.rollNumber), asc(subjects.name));
+}
+
+export interface OpenSelfCheckin {
+  id: string;
+  /** ISO instant the window was opened; deadline = openedAt + selfCheckinWindowMinutes. */
+  selfCheckinOpenedAt: string;
+  slotId: string;
+  subject: string;
+  startTime: string;
+  endTime: string;
+}
+
+/** The still-open self check-in window for a section today (excludes expired windows). */
+export async function getOpenSelfCheckinForSection(
+  sectionId: string,
+  date: string
+): Promise<OpenSelfCheckin | null> {
+  const config = await getAppConfig();
+  const cutoff = new Date(Date.now() - config.selfCheckinWindowMinutes * 60_000);
+  const rows = (await rawSql`
+    SELECT s.id, s.self_checkin_opened_at AS "selfCheckinOpenedAt",
+           ts.id AS "slotId", sub.name AS subject,
+           p.start_time AS "startTime", p.end_time AS "endTime"
+    FROM attendance_sessions s
+    JOIN timetable_slots ts ON ts.id = s.timetable_slot_id
+    JOIN subjects sub ON sub.id = s.subject_id
+    JOIN periods p ON p.id = ts.period_id
+    WHERE s.section_id = ${sectionId} AND s.date = ${date}
+      AND s.submitted_at IS NULL
+      AND s.self_checkin_opened_at IS NOT NULL
+      AND s.self_checkin_opened_at > ${cutoff}
+    LIMIT 1
+  `) as unknown as {
+    id: string;
+    selfCheckinOpenedAt: Date | string;
+    slotId: string;
+    subject: string;
+    startTime: string;
+    endTime: string;
+  }[];
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    selfCheckinOpenedAt:
+      row.selfCheckinOpenedAt instanceof Date
+        ? row.selfCheckinOpenedAt.toISOString()
+        : new Date(String(row.selfCheckinOpenedAt)).toISOString(),
+    slotId: row.slotId,
+    subject: row.subject,
+    startTime: String(row.startTime),
+    endTime: String(row.endTime),
+  };
+}
+
+/* ---------------- Admin Setup lists ---------------- */
+
+export interface StudentAdminRow {
+  id: string;
+  rollNumber: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean | null;
+  contactLockedAt: Date | null;
+}
+
+export async function getStudentsAdminList(search?: string): Promise<StudentAdminRow[]> {
+  const rows = await db
+    .select({
+      id: students.id,
+      rollNumber: students.rollNumber,
+      fullName: students.fullName,
+      email: students.email,
+      phone: students.phone,
+      isActive: students.isActive,
+      contactLockedAt: students.contactLockedAt,
+    })
+    .from(students)
+    .orderBy(asc(students.rollNumber));
+
+  if (!search || search.trim() === "") return rows;
+
+  const term = search.toLowerCase();
+  return rows.filter(
+    (s) =>
+      s.rollNumber?.toLowerCase().includes(term) ||
+      s.fullName?.toLowerCase().includes(term) ||
+      s.email?.toLowerCase().includes(term)
+  );
+}
+
+export async function getSectionsFull() {
+  return db
+    .select({
+      id: sections.id,
+      name: sections.name,
+      studyYearId: studyYears.id,
+      year: studyYears.label,
+      yearNumber: studyYears.yearNumber,
+      programId: programs.id,
+      program: programs.name,
+      departmentId: programs.departmentId,
+      department: departments.name,
+      classTeacherId: sections.classTeacherId,
+      classTeacher: faculty.fullName,
+    })
+    .from(sections)
+    .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
+    .innerJoin(programs, eq(studyYears.programId, programs.id))
+    .innerJoin(departments, eq(programs.departmentId, departments.id))
+    .leftJoin(faculty, eq(sections.classTeacherId, faculty.id))
+    .orderBy(asc(departments.name), asc(studyYears.yearNumber), asc(sections.name));
+}
+
+export async function getSubjectsList() {
+  return db
+    .select({
+      id: subjects.id,
+      name: subjects.name,
+      code: subjects.code,
+      shortName: subjects.shortName,
+      isLab: subjects.isLab,
+      isElective: subjects.isElective,
+      departmentId: subjects.departmentId,
+      department: departments.name,
+    })
+    .from(subjects)
+    .leftJoin(departments, eq(subjects.departmentId, departments.id))
+    .orderBy(asc(subjects.name));
+}
+
+export async function getAcademicYearsList() {
+  return db
+    .select({
+      id: academicYears.id,
+      name: academicYears.name,
+      startDate: academicYears.startDate,
+      endDate: academicYears.endDate,
+      isCurrent: academicYears.isCurrent,
+    })
+    .from(academicYears)
+    .orderBy(desc(academicYears.startDate));
 }

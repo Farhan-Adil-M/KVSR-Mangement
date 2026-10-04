@@ -11,14 +11,9 @@ import {
   getCurrentAcademicYearId,
   isSectionInHodDepartment,
 } from "@/lib/auth/guards";
+import { descriptorSchema } from "@/lib/validation/biometric";
+import { isUniqueViolation } from "@/lib/db/pg-errors";
 
-const descriptorSchema = z
-  .array(z.number())
-  .length(128)
-  .refine(
-    (arr) => arr.every((n) => Number.isFinite(n) && Math.abs(n) < 1e3),
-    "descriptor must be finite and bounded"
-  );
 const enrollSchema = z.object({
   studentId: z.string().uuid(),
   descriptor: descriptorSchema,
@@ -114,6 +109,121 @@ export async function enrollBiometric(input: unknown): Promise<EnrollResult> {
     return { success: true };
   } catch (error) {
     console.error("Failed to enroll biometric:", error);
+    return { success: false, error: "Failed to save biometric." };
+  }
+}
+
+/* ---------------- Reinforcement (photo attendance "get smarter" loop) ---------------- */
+
+// Capped running average: an uncapped average freezes the stored face; the cap
+// keeps it adapting to appearance changes while diluting single-frame noise.
+const REINFORCE_CAP = 20;
+
+const reinforceSchema = z.object({
+  studentId: z.string().uuid(),
+  descriptor: descriptorSchema,
+  // Required only when the student has no biometric row yet (insert path).
+  consent: z.literal(true).optional(),
+});
+
+export type ReinforceResult = { success: true } | { success: false; error: string };
+
+/**
+ * Merges a confirmed-match descriptor into the student's stored descriptor as a
+ * capped running average. Same authorization chain as enrollBiometric.
+ */
+export async function reinforceBiometric(input: unknown): Promise<ReinforceResult> {
+  const session = await getSession();
+  if (!session) return { success: false, error: "Not authenticated." };
+  if (
+    session.role !== "faculty" &&
+    session.role !== "hod" &&
+    session.role !== "admin"
+  ) {
+    return { success: false, error: "Not authorized." };
+  }
+
+  const parsed = reinforceSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid biometric payload." };
+  const { studentId, descriptor, consent } = parsed.data;
+
+  if (session.role === "faculty" || session.role === "hod") {
+    const yearId = await getCurrentAcademicYearId();
+    if (!yearId) return { success: false, error: "No active academic year." };
+    const [enr] = await db
+      .select({ sectionId: studentEnrollments.sectionId })
+      .from(studentEnrollments)
+      .where(
+        and(
+          eq(studentEnrollments.studentId, studentId),
+          eq(studentEnrollments.academicYearId, yearId),
+          eq(studentEnrollments.isActive, true)
+        )
+      )
+      .limit(1);
+    if (!enr) return { success: false, error: "Student is not enrolled." };
+    if (session.role === "faculty") {
+      const assigned = await isFacultyAssigned(session.id, enr.sectionId);
+      if (!assigned)
+        return { success: false, error: "You are not assigned to this student's class." };
+    } else {
+      const inDept = await isSectionInHodDepartment(session.id, enr.sectionId);
+      if (!inDept)
+        return { success: false, error: "This student is outside your department." };
+    }
+  }
+
+  try {
+    const [existing] = await db
+      .select({
+        descriptor: studentBiometrics.descriptor,
+        descriptorCount: studentBiometrics.descriptorCount,
+      })
+      .from(studentBiometrics)
+      .where(eq(studentBiometrics.studentId, studentId))
+      .limit(1);
+
+    if (!existing) {
+      if (consent !== true) {
+        return { success: false, error: "Explicit consent is required to enroll a biometric." };
+      }
+      await db.insert(studentBiometrics).values({
+        studentId,
+        descriptor,
+        enrolledBy: session.id,
+        consentedAt: new Date(),
+        consentVersion: "1.0",
+      });
+      revalidatePath("/faculty/students");
+      return { success: true };
+    }
+
+    const stored = existing.descriptor as unknown as number[];
+    if (!Array.isArray(stored) || stored.length !== 128) {
+      return { success: false, error: "Stored biometric is invalid." };
+    }
+    const n = Math.min((existing.descriptorCount ?? 1) + 1, REINFORCE_CAP);
+    const merged = stored.map((v, i) => v + (descriptor[i] - v) / n);
+    await db
+      .update(studentBiometrics)
+      .set({
+        descriptor: merged,
+        descriptorCount: n,
+        lastMatchedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(studentBiometrics.studentId, studentId));
+
+    revalidatePath("/faculty/students");
+    return { success: true };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return {
+        success: false,
+        error: "Biometric was just enrolled by someone else. Refresh and retry.",
+      };
+    }
+    console.error("Failed to reinforce biometric:", error);
     return { success: false, error: "Failed to save biometric." };
   }
 }

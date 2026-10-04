@@ -6,9 +6,11 @@ import Image from "next/image";
 interface LogoAnimationProps {
   size?: number;
   variant?: "hero" | "nav";
+  /** Accessible name for the crest image (institution short name). */
+  alt?: string;
 }
 
-export function LogoAnimation({ size = 120, variant = "hero" }: LogoAnimationProps) {
+export function LogoAnimation({ size = 120, variant = "hero", alt = "Institution crest" }: LogoAnimationProps) {
   const isHero = variant === "hero";
 
   return (
@@ -26,7 +28,7 @@ export function LogoAnimation({ size = 120, variant = "hero" }: LogoAnimationPro
       >
         <Image
           src="/College_logo.jpg"
-          alt="KVSRIT crest"
+          alt={alt}
           width={size}
           height={size}
           priority

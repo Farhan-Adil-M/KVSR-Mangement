@@ -58,6 +58,11 @@ export async function requireHod() {
   return session;
 }
 
+/** HOD-exclusive tier (hod or admin, never plain faculty). Page-level guard. */
+export async function requireHodOnly(): Promise<SessionUser> {
+  return requireHod();
+}
+
 export async function requireFaculty() {
   const session = await requireSession();
   if (session.role !== "faculty" && session.role !== "hod") {

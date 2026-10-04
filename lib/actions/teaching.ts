@@ -12,7 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { getSession } from "@/lib/auth/session";
-import { isFacultyAssigned, getCurrentAcademicYearId } from "@/lib/auth/guards";
+import { isFacultyAssigned, isSectionInHodDepartment, getCurrentAcademicYearId } from "@/lib/auth/guards";
 
 export type ActionResult = { success: true } | { success: false; error: string };
 
@@ -33,13 +33,14 @@ async function facultyContext(): Promise<FacultyContext> {
   return { session, yearId };
 }
 
-/** Admin/HOD bypass assignment checks; faculty must be assigned to section (+subject when given). */
+/** Admin unrestricted; HOD must own the section's department; faculty must be assigned to section (+subject when given). */
 async function assertAccess(
   session: { role: "admin" | "hod" | "faculty" | "student"; id: string },
   sectionId: string,
   subjectId?: string
 ) {
-  if (session.role === "admin" || session.role === "hod") return true;
+  if (session.role === "admin") return true;
+  if (session.role === "hod") return isSectionInHodDepartment(session.id, sectionId);
   return isFacultyAssigned(session.id, sectionId, subjectId);
 }
 

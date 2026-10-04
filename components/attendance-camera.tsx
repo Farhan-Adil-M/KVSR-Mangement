@@ -13,9 +13,6 @@ interface Student {
   rollNumber: string;
 }
 
-const MATCH_THRESHOLD = 0.5; // face-api euclidean distance; lower = stricter
-const SCAN_INTERVAL_MS = 1500;
-
 function distance(a: number[], b: number[]): number {
   let sum = 0;
   for (let i = 0; i < a.length; i++) {
@@ -31,12 +28,16 @@ export function AttendanceCamera({
   timetableSlotId,
   sessionDate,
   slotLabel,
+  matchThreshold = 0.5,
+  scanIntervalMs = 1500,
 }: {
   students: Student[];
   sectionId: string;
   timetableSlotId: string;
   sessionDate: string;
   slotLabel: string;
+  matchThreshold?: number;
+  scanIntervalMs?: number;
 }) {
   const camRef = useRef<FaceCameraHandle>(null);
   const [status, setStatus] = useState("Starting cameraâ€¦");
@@ -106,7 +107,7 @@ export function AttendanceCamera({
             bestId = b.studentId;
           }
         }
-        if (bestId && bestDist < MATCH_THRESHOLD) matched.add(bestId);
+        if (bestId && bestDist < matchThreshold) matched.add(bestId);
         else unknown += 1;
       }
       setMatchedIds((prev) => {
@@ -124,7 +125,7 @@ export function AttendanceCamera({
         `Live scanning â€” ${matched.size} recognized this frame` +
           (unknown > 0 ? `, ${unknown} unknown.` : ".")
       );
-    }, SCAN_INTERVAL_MS);
+    }, scanIntervalMs);
   }
 
   const toggle = (id: string) => {

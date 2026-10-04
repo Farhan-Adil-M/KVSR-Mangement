@@ -7,13 +7,24 @@ import { AudienceSection } from "./audience-section";
 import { TestimonialsSection } from "./testimonials-section";
 import { CtaSection } from "./cta-section";
 import { Footer } from "./footer";
+import { getAppConfig } from "@/lib/app-config";
 
-export function LandingPage() {
+/**
+ * Server component: loads institution identity once and passes it down as
+ * props to the client landing sections (spec I6 note — config values are
+ * never re-hardcoded in client components).
+ */
+export async function LandingPage() {
+  const config = await getAppConfig();
+
   return (
     <div id="top" className="min-h-screen bg-kvsr-deep">
-      <SiteHeader />
+      <SiteHeader institutionShortName={config.institutionShortName} />
       <main>
-        <HeroSection />
+        <HeroSection
+          institutionName={config.institutionName}
+          institutionShortName={config.institutionShortName}
+        />
         <MarqueeSection />
         <StatsSection />
         <FeatureGrid />
@@ -21,7 +32,12 @@ export function LandingPage() {
         <TestimonialsSection />
         <CtaSection />
       </main>
-      <Footer />
+      <Footer
+        institutionName={config.institutionName}
+        institutionShortName={config.institutionShortName}
+        institutionPhone={config.institutionPhone}
+        institutionEmail={config.institutionEmail}
+      />
     </div>
   );
 }

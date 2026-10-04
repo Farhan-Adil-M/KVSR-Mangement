@@ -14,26 +14,33 @@ import {
   getDashboardStats,
 } from "@/lib/db/queries";
 import { getCampusSettings } from "@/lib/actions/campus";
+import { getAppConfig } from "@/lib/app-config";
 import { CampusSettingsForm } from "@/components/campus-settings-form";
+import { AppSettingsForm } from "@/components/app-settings-form";
 import {
   DepartmentsProgramsManager,
   type DepartmentItem,
 } from "@/components/departments-programs-manager";
-import { Calendar, Database, Clock, MapPin } from "lucide-react";
+import { Calendar, Database, Clock, MapPin, SlidersHorizontal } from "lucide-react";
 
-export const metadata = {
-  title: "Settings | KVSR Management",
-};
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `Settings | ${config.institutionShortName} Management`,
+  };
+}
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const [config, departmentsData, periods, stats, campus] = await Promise.all([
-    getSystemConfig(),
-    getDepartmentsWithPrograms(),
-    getPeriods(),
-    getDashboardStats(),
-    getCampusSettings(),
-  ]);
+  const [config, departmentsData, periods, stats, campus, appConfig] =
+    await Promise.all([
+      getSystemConfig(),
+      getDepartmentsWithPrograms(),
+      getPeriods(),
+      getDashboardStats(),
+      getCampusSettings(),
+      getAppConfig(),
+    ]);
 
   // Group programs by department
   const departments = departmentsData.reduce(
@@ -105,6 +112,22 @@ export default async function SettingsPage() {
                 />
               </>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-kvsr-soft bg-white shadow-sm">
+          <CardHeader className="px-6 pt-6 pb-3">
+            <CardTitle className="text-lg text-kvsr-navy flex items-center gap-2">
+              <SlidersHorizontal className="w-5 h-5 text-kvsr-orange" />
+              App Configuration
+            </CardTitle>
+            <CardDescription className="pl-7">
+              Thresholds and identity used across every portal — students,
+              faculty and the public pages.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <AppSettingsForm initial={appConfig} />
           </CardContent>
         </Card>
 

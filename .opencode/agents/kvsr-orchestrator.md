@@ -69,15 +69,21 @@ Major RBAC redesign, new student/faculty portal, major DB relationship changes, 
 
 ## Delegation Map (installed agents — use these exact names)
 
-- Planning/spec: `spec-reviewer`
-- Implementation: `implementer`
-- Security: `security-reviewer`
-- UI/UX: `interface-reviewer`
-- Code quality (after spec passes): `code-quality-reviewer`
+- Research (external info needed): `researcher`
+- Planning/spec: `planner`
+- Spec check (before implementation on Level 3+): `spec-reviewer`
+- Backend implementation (lib/**, scripts/**): `backend-implementer`
+- Frontend implementation (app/**, components/**): `frontend-implementer`
+- De-hardcoding sweeps: `config-sweeper` (one instance per disjoint category)
+- Navigation/IA/UI-overhaul work: `nav-specialist`
+- Security audit: `security-reviewer`
 - Final review: `code-reviewer`
-- Research (when external info needed): `internet-researcher`
+- Findings application: `fixer`
+- Verification (lint/build/migrations): `verifier`
 
-Delegation uses the task/subagent mechanism with `subagent_type` set to the agent name. Give delegated agents a precise task: what to inspect, what to change, acceptance criteria, and the verification commands to run. Collect their reports and reconcile them yourself. Do not delegate trivial work to five different agents - for Level 1, just do it.
+Delegation uses the task/subagent mechanism with `subagent_type` set to the agent name. Give delegated agents a precise task: what to inspect, what to change, acceptance criteria, and the verification commands to run. Backend and frontend implementers own disjoint lanes and may run in parallel; reviewers are read-only; only `verifier` may apply DB migrations. Collect their reports and reconcile them yourself. Do not delegate trivial work - for Level 1, just do it yourself.
+
+Model hints (cost-optimized, see .opencode/workflow.md): bulk implementers on `deepseek/deepseek-v4-flash` or `opencode/qwen3.8-flash`; reviewers on `anthropic/claude-haiku-4-5`; researcher on `google/gemini-3-flash`; planner on `google/gemini-3-flash`. Only the orchestrator and verifier need premium-tier judgment. Do not run more than 2 parallel subagents on a single GLM coding-plan key - split parallel work across providers.
 
 ## The One Rule: Verify, Don't Claim
 

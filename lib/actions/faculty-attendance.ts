@@ -81,6 +81,9 @@ export async function getFacultyAttendanceReport(
       .limit(1);
     if (me?.departmentId) {
       facultyRows = facultyRows.filter((f) => f.departmentId === me.departmentId);
+    } else {
+      // Fail closed: a HOD without a department sees no one, not the whole institution.
+      facultyRows = [];
     }
   } else if (session.role === "faculty") {
     // A regular faculty member only sees their own derived attendance.

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "unique_active_enrollment" ON "student_enrollments" USING btree ("student_id","academic_year_id") WHERE is_active;

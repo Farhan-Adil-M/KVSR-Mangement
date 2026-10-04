@@ -2,6 +2,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import { getStudentMarks } from "@/lib/db/portal-queries";
+import { getAppConfig } from "@/lib/app-config";
 import { Award } from "lucide-react";
 
 export const metadata = { title: "My Marks | KVSR Management" };
@@ -25,7 +26,10 @@ export default async function StudentMarksPage() {
     );
   }
 
-  const marks = await getStudentMarks(session.id);
+  const [marks, config] = await Promise.all([
+    getStudentMarks(session.id),
+    getAppConfig(),
+  ]);
 
   // Group by subject
   const bySubject = new Map<string, typeof marks>();
@@ -79,7 +83,11 @@ export default async function StudentMarksPage() {
                             </span>
                             <span
                               className={`text-sm font-semibold w-12 text-right ${
-                                pct >= 60 ? "text-emerald-600" : pct >= 40 ? "text-amber-600" : "text-red-600"
+                                pct >= config.marksGoodPct
+                                  ? "text-emerald-600"
+                                  : pct >= config.marksWarnPct
+                                  ? "text-amber-600"
+                                  : "text-red-600"
                               }`}
                             >
                               {pct}%

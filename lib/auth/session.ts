@@ -17,8 +17,11 @@ export interface SessionUser {
   exp: number;
 }
 
-export function createSessionPayload(user: Omit<SessionUser, "exp">): SessionUser {
-  return { ...user, exp: Math.floor(Date.now() / 1000) + SESSION_DAYS * 24 * 60 * 60 };
+export function createSessionPayload(
+  user: Omit<SessionUser, "exp">,
+  days: number = SESSION_DAYS
+): SessionUser {
+  return { ...user, exp: Math.floor(Date.now() / 1000) + days * 24 * 60 * 60 };
 }
 
 async function getKey() {
@@ -80,16 +83,17 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
-export async function setSession(user: Omit<SessionUser, "exp">) {
+export async function setSession(user: Omit<SessionUser, "exp">, daysOverride?: number) {
+  const days = daysOverride && daysOverride > 0 ? daysOverride : SESSION_DAYS;
   const cookieStore = await cookies();
-  const value = JSON.stringify(createSessionPayload(user));
+  const value = JSON.stringify(createSessionPayload(user, days));
   const signed = await sign(value);
 
   cookieStore.set(COOKIE_NAME, signed, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    maxAge: days * 24 * 60 * 60,
     path: "/",
   });
 }

@@ -5,7 +5,14 @@ import { useState } from "react";
 import { TimetableSlotWithDetails } from "@/lib/db/queries";
 import { Beaker, User, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DEFAULT_TEACHING_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 const PERIOD_TIMES = [
   { period: 1, start: "09:50", end: "10:50" },
@@ -22,6 +29,7 @@ interface TimetableGridProps {
   sectionName: string;
   sections: { id: string; name: string; year: string }[];
   selectedSectionId: string;
+  teachingDays?: string[];
 }
 
 export function TimetableGrid({
@@ -29,18 +37,20 @@ export function TimetableGrid({
   sectionName,
   sections,
   selectedSectionId,
+  teachingDays,
 }: TimetableGridProps) {
-  const [activeDay, setActiveDay] = useState("Monday");
+  const days = teachingDays ?? DEFAULT_TEACHING_DAYS;
+  const [activeDay, setActiveDay] = useState(days[0] ?? "Monday");
 
   const daySlots = slots.filter((slot) => slot.dayOfWeek === activeDay);
-  const activeDayIndex = DAYS.indexOf(activeDay);
+  const activeDayIndex = days.indexOf(activeDay);
 
   const navigateDay = (direction: "prev" | "next") => {
     const newIndex =
       direction === "prev"
         ? Math.max(0, activeDayIndex - 1)
-        : Math.min(DAYS.length - 1, activeDayIndex + 1);
-    setActiveDay(DAYS[newIndex]);
+        : Math.min(days.length - 1, activeDayIndex + 1);
+    setActiveDay(days[newIndex]);
   };
 
   const getSlotForPeriod = (periodNumber: number) => {
@@ -99,7 +109,7 @@ export function TimetableGrid({
           <span className="font-semibold text-kvsr-navy">{activeDay}</span>
           <button
             onClick={() => navigateDay("next")}
-            disabled={activeDayIndex === DAYS.length - 1}
+            disabled={activeDayIndex === days.length - 1}
             className="p-2 rounded-lg hover:bg-muted disabled:opacity-30"
           >
             <ChevronRight className="w-5 h-5" />
@@ -107,7 +117,7 @@ export function TimetableGrid({
         </div>
 
         <div className="hidden sm:flex items-center gap-1">
-          {DAYS.map((day) => {
+          {days.map((day) => {
             const isActive = day === activeDay;
             return (
               <button

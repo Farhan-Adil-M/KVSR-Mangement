@@ -1,37 +1,31 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { studentBiometrics, students } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { setSession } from "@/lib/auth/session";
-import type { SessionUser } from "@/lib/auth/session";
+import { getAppConfig } from "@/lib/app-config";
+import { descriptorSchema, euclideanDistance } from "@/lib/validation/biometric";
+import { homeForRole } from "@/lib/auth/guards";
 
-const MATCH_THRESHOLD = 0.5; // face-api euclidean distance; lower = stricter
-
-function distance(a: number[], b: number[]): number {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) {
-    const d = a[i] - b[i];
-    sum += d * d;
-  }
-  return Math.sqrt(sum);
-}
+export type IdentifyAndLoginResult =
+  | { success: true; redirect: string }
+  | { success: false; error: string };
 
 /**
- * Identify a person by their face descriptor. Matches against enrolled
- * student biometrics (the primary face-identified role). Returns the user
- * to establish a session for, or ok:false when there is no confident match.
+ * Face sign-in: matches the descriptor against enrolled+active student
+ * biometrics server-side and establishes the session from the DB row.
+ * The client never supplies identity — only the raw descriptor.
  */
-export async function identifyByFace(
+export async function identifyAndLogin(
   descriptor: number[]
-): Promise<
-  | { ok: true; user: { id: string; name: string; role: "student" } }
-  | { ok: false }
-> {
-  if (!Array.isArray(descriptor) || descriptor.length === 0) {
-    return { ok: false };
+): Promise<IdentifyAndLoginResult> {
+  const parsed = descriptorSchema.safeParse(descriptor);
+  if (!parsed.success) {
+    return { success: false, error: "No matching face. Use password sign-in." };
   }
+
+  const config = await getAppConfig();
 
   const rows = await db
     .select({
@@ -40,7 +34,8 @@ export async function identifyByFace(
       name: students.fullName,
     })
     .from(studentBiometrics)
-    .leftJoin(students, eq(studentBiometrics.studentId, students.id));
+    .innerJoin(students, eq(studentBiometrics.studentId, students.id))
+    .where(eq(students.isActive, true));
 
   let bestId: string | null = null;
   let bestName: string | null = null;
@@ -48,7 +43,7 @@ export async function identifyByFace(
 
   for (const r of rows) {
     if (!Array.isArray(r.descriptor)) continue;
-    const d = distance(descriptor, r.descriptor as number[]);
+    const d = euclideanDistance(parsed.data, r.descriptor as number[]);
     if (d < bestDist) {
       bestDist = d;
       bestId = r.studentId;
@@ -56,32 +51,13 @@ export async function identifyByFace(
     }
   }
 
-  if (bestId && bestDist < MATCH_THRESHOLD) {
-    return {
-      ok: true,
-      user: { id: bestId, name: bestName ?? "Student", role: "student" },
-    };
+  if (!bestId || bestDist >= config.matchThreshold) {
+    return { success: false, error: "No matching face. Use password sign-in." };
   }
-  return { ok: false };
-}
 
-/** Establish a session for an already-identified user and route to their portal. */
-export async function loginByIdentified(user: {
-  id: string;
-  name: string;
-  role: SessionUser["role"];
-}) {
-  const sessionUser: Omit<SessionUser, "exp"> = {
-    id: user.id,
-    name: user.name,
-    role: user.role,
-  };
-  await setSession(sessionUser);
-  const home: Record<SessionUser["role"], string> = {
-    admin: "/admin/dashboard",
-    hod: "/faculty/dashboard",
-    faculty: "/faculty/dashboard",
-    student: "/student/dashboard",
-  };
-  redirect(home[user.role]);
+  await setSession(
+    { id: bestId, name: bestName ?? "Student", role: "student" },
+    config.sessionDays
+  );
+  return { success: true, redirect: homeForRole("student") };
 }

@@ -4,6 +4,7 @@
  * Attendance is always computed from raw attendance_records (source of truth).
  */
 import { rawSql } from "./index";
+import { getAppConfig } from "@/lib/app-config";
 
 /* ================= FACULTY ================= */
 
@@ -228,7 +229,7 @@ export interface SubjectAttendance {
   percentage: number;
 }
 
-/** Own attendance from raw records: per-subject held/attended + overall. */
+/** Own attendance from raw records: per-subject held/attended + overall. Only submitted rosters count as held. */
 export async function getStudentAttendance(studentId: string, sectionId: string) {
   const rows = await rawSql`
     SELECT sub.id AS "subjectId", sub.name AS subject,
@@ -243,6 +244,7 @@ export async function getStudentAttendance(studentId: string, sectionId: string)
     LEFT JOIN attendance_records r
       ON r.session_id = sess.id AND r.student_id = ${studentId}
     WHERE sess.section_id = ${sectionId}
+      AND sess.submitted_at IS NOT NULL
     GROUP BY sub.id, sub.name
     ORDER BY sub.name
   `;
@@ -442,9 +444,11 @@ export interface StudentAnalyticsRow {
 /**
  * Per-student performance for the current year. Aggregates ALL evaluations
  * (avg across evaluators) — one faculty rating never defines the score.
- * overall = (academic*0.5 + behaviour*0.2 + participation*0.3) / 5 * 100
+ * overall = weighted evaluation / 5 * 100 with weights from app config
+ * (read internally via getAppConfig so every caller is config-driven).
  */
 export async function getStudentAnalytics(): Promise<StudentAnalyticsRow[]> {
+  const config = await getAppConfig();
   const rows = await rawSql`
     WITH att AS (
       SELECT se.student_id,
@@ -455,6 +459,7 @@ export async function getStudentAnalytics(): Promise<StudentAnalyticsRow[]> {
         ON ts.section_id = se.section_id AND ts.academic_year_id = se.academic_year_id
         AND ts.is_active = true
       JOIN attendance_sessions sess ON sess.timetable_slot_id = ts.id
+        AND sess.submitted_at IS NOT NULL
       LEFT JOIN attendance_records r
         ON r.session_id = sess.id AND r.student_id = se.student_id
       WHERE se.academic_year_id = (SELECT id FROM academic_years WHERE is_current = true)
@@ -477,7 +482,7 @@ export async function getStudentAnalytics(): Promise<StudentAnalyticsRow[]> {
            CASE WHEN att.held > 0 THEN ROUND(att.attended::numeric * 100 / att.held, 0) ELSE NULL END AS "attendancePct",
            eval.academic, eval.behaviour, eval.participation, eval.evaluators,
            CASE WHEN eval.academic IS NOT NULL
-                THEN ROUND(((eval.academic * 0.5 + eval.behaviour * 0.2 + eval.participation * 0.3) / 5) * 100, 0)
+                THEN ROUND(((eval.academic * ${config.evalWeightAcademic} + eval.behaviour * ${config.evalWeightBehaviour} + eval.participation * ${config.evalWeightParticipation}) / 5) * 100, 0)
                 ELSE NULL END AS "overallPct"
     FROM students st
     JOIN student_enrollments se ON se.student_id = st.id

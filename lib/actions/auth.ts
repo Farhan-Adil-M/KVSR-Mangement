@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { faculty, students, admins } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { setSession, clearSession, type SessionUser } from "@/lib/auth/session";
+import { getAppConfig } from "@/lib/app-config";
 
 export async function login(
   username: string,
@@ -17,6 +18,8 @@ export async function login(
   if (!trimmedUsername || !trimmedPassword) {
     return { success: false, error: "Username and password are required." };
   }
+
+  const { sessionDays } = await getAppConfig();
 
   if (role === "admin") {
     const [admin] = await db
@@ -45,7 +48,7 @@ export async function login(
       role: "admin",
     };
 
-    await setSession(user);
+    await setSession(user, sessionDays);
     return { success: true, user };
   }
 
@@ -77,7 +80,7 @@ export async function login(
       role: member.isHod ? "hod" : "faculty",
     };
 
-    await setSession(user);
+    await setSession(user, sessionDays);
     return { success: true, user };
   }
 
@@ -103,7 +106,7 @@ export async function login(
     role: "student",
   };
 
-  await setSession(user);
+  await setSession(user, sessionDays);
   return { success: true, user };
 }
 

@@ -9,7 +9,11 @@ const NAV_LINKS = [
   { href: "#contact", label: "Contact" },
 ];
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  institutionShortName: string;
+}
+
+export function SiteHeader({ institutionShortName }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-kvsr-deep/70 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -17,9 +21,9 @@ export function SiteHeader() {
           href="/"
           className="flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold rounded-lg"
         >
-          <LogoAnimation size={36} variant="nav" />
+          <LogoAnimation size={36} variant="nav" alt={`${institutionShortName} crest`} />
           <span className="font-display text-lg font-semibold text-white tracking-wide">
-            KVSRIT
+            {institutionShortName}
           </span>
         </Link>
 

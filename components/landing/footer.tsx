@@ -42,7 +42,19 @@ const ACCREDITATIONS = [
   "JNTUA",
 ];
 
-export function Footer() {
+interface FooterProps {
+  institutionName: string;
+  institutionShortName: string;
+  institutionPhone: string;
+  institutionEmail: string;
+}
+
+export function Footer({
+  institutionName,
+  institutionShortName,
+  institutionPhone,
+  institutionEmail,
+}: FooterProps) {
   return (
     <footer id="contact" className="scroll-mt-16 bg-kvsr-navy text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -50,17 +62,16 @@ export function Footer() {
           {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-4">
-              <LogoAnimation size={48} variant="nav" />
+              <LogoAnimation size={48} variant="nav" alt={`${institutionShortName} crest`} />
               <div>
                 <p className="font-display text-lg font-semibold">
-                  KVSR Management
+                  {institutionShortName} Management
                 </p>
-                <p className="text-xs text-slate-400">KVSRIT · Kurnool</p>
+                <p className="text-xs text-slate-400">{institutionShortName} · Kurnool</p>
               </div>
             </div>
             <p className="text-sm text-slate-400 leading-relaxed">
-              The operations platform of Dr. K.V. Subba Reddy Institute of
-              Technology, Kurnool.
+              The operations platform of {institutionName}, Kurnool.
             </p>
           </div>
 
@@ -110,25 +121,24 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-slate-400">
                 <MapPin size={16} className="text-kvsr-gold shrink-0 mt-0.5" aria-hidden="true" />
-                Dr. K.V. Subba Reddy Institute of Technology, Kurnool, Andhra
-                Pradesh 518218
+                {institutionName}, Kurnool, Andhra Pradesh 518218
               </li>
               <li>
                 <a
-                  href="tel:+918518200000"
+                  href={`tel:${institutionPhone}`}
                   className="inline-flex items-center gap-2.5 py-1.5 -my-1.5 text-sm text-slate-400 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold rounded"
                 >
                   <Phone size={16} className="text-kvsr-gold shrink-0" aria-hidden="true" />
-                  +91 8518 200 000
+                  {institutionPhone}
                 </a>
               </li>
               <li>
                 <a
-                  href="mailto:support@kvsrit.edu.in"
+                  href={`mailto:${institutionEmail}`}
                   className="inline-flex items-center gap-2.5 py-1.5 -my-1.5 text-sm text-slate-400 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-kvsr-gold rounded"
                 >
                   <Mail size={16} className="text-kvsr-gold shrink-0" aria-hidden="true" />
-                  support@kvsrit.edu.in
+                  {institutionEmail}
                 </a>
               </li>
             </ul>
@@ -162,8 +172,7 @@ export function Footer() {
           </div>
 
           <p className="text-xs text-slate-400 text-center sm:text-right">
-            © 2026 Dr. K.V. Subba Reddy Institute of Technology. All rights
-            reserved.
+            © 2026 {institutionName}. All rights reserved.
           </p>
 
           <button

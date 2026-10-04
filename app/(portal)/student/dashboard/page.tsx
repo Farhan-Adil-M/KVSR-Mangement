@@ -1,17 +1,24 @@
 import Link from "next/link";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
+import { SelfCheckinCard } from "@/components/self-checkin-card";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import {
   getStudentAttendance,
   getStudentNotifications,
 } from "@/lib/db/portal-queries";
-import { getTimetableForSection } from "@/lib/db/queries";
+import { getAppConfig } from "@/lib/app-config";
+import { getTimetableForSection, getOpenSelfCheckinForSection } from "@/lib/db/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClipboardCheck, Calendar, Bell, ArrowRight, Clock } from "lucide-react";
 import { getCollegeNow } from "@/lib/utils";
 
-export const metadata = { title: "Student Dashboard | KVSR Management" };
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `Student Dashboard | ${config.institutionShortName} Management`,
+  };
+}
 export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
@@ -36,10 +43,12 @@ export default async function StudentDashboardPage() {
   const collegeNow = getCollegeNow();
   const today = collegeNow.dayName;
 
-  const [attendance, notifications, daySlots] = await Promise.all([
+  const [attendance, notifications, daySlots, config, openCheckin] = await Promise.all([
     getStudentAttendance(session.id, ctx.sectionId),
     getStudentNotifications(session.id),
     today !== "Sunday" ? getTimetableForSection(ctx.sectionId) : Promise.resolve([]),
+    getAppConfig(),
+    getOpenSelfCheckinForSection(ctx.sectionId, collegeNow.date),
   ]);
 
   const todayClasses = daySlots
@@ -54,9 +63,9 @@ export default async function StudentDashboardPage() {
   const nextClass = todayClasses.find((s) => toMinutes(s.startTime) > nowMinutes) ?? null;
 
   const attendanceColor =
-    attendance.overallPercentage >= 75
+    attendance.overallPercentage >= config.attendanceGoodPct
       ? "text-emerald-600"
-      : attendance.overallPercentage >= 60
+      : attendance.overallPercentage >= config.attendanceWarnPct
       ? "text-amber-600"
       : "text-red-600";
 
@@ -67,6 +76,18 @@ export default async function StudentDashboardPage() {
           title={`Hello, ${session.name}`}
           subtitle={`${ctx.yearLabel}-${ctx.sectionName} · Roll #${ctx.rollNumber}`}
         />
+
+        {openCheckin && (
+          <div className="mb-6">
+            <SelfCheckinCard
+              timetableSlotId={openCheckin.slotId}
+              subject={openCheckin.subject}
+              periodLabel={`${openCheckin.startTime.slice(0, 5)}–${openCheckin.endTime.slice(0, 5)}`}
+              openedAt={openCheckin.selfCheckinOpenedAt}
+              windowMinutes={config.selfCheckinWindowMinutes}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Overall attendance */}

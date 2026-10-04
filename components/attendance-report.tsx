@@ -24,6 +24,8 @@ interface AttendanceReportProps {
   report: ReportRow[];
   sections: Section[];
   selectedSectionId: string;
+  goodPct: number;
+  warnPct: number;
 }
 
 function calculatePercentage(held: number, attended: number) {
@@ -35,6 +37,8 @@ export function AttendanceReport({
   report,
   sections,
   selectedSectionId,
+  goodPct,
+  warnPct,
 }: AttendanceReportProps) {
   // Aggregate per student
   const studentMap = new Map<
@@ -179,11 +183,11 @@ export function AttendanceReport({
               <div className="flex items-center gap-2 mb-2">
                 <TrendingDown className="w-4 h-4 text-red-500" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Below 75%
+                  Below {goodPct}%
                 </span>
               </div>
               <div className="text-3xl font-bold text-kvsr-ink">
-                {students.filter((s) => s.percentage < 75).length}
+                {students.filter((s) => s.percentage < goodPct).length}
               </div>
             </div>
           </div>
@@ -213,9 +217,9 @@ export function AttendanceReport({
                         animate={{ width: `${subject.percentage}%` }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                         className={`h-full rounded-full ${
-                          subject.percentage >= 75
+                          subject.percentage >= goodPct
                             ? "bg-emerald-500"
-                            : subject.percentage >= 60
+                            : subject.percentage >= warnPct
                             ? "bg-kvsr-gold"
                             : "bg-red-500"
                         }`}
@@ -266,9 +270,9 @@ export function AttendanceReport({
                     <div className="w-32 sm:w-40 h-2 rounded-full bg-kvsr-navy/10 overflow-hidden">
                       <div
                         className={`h-full rounded-full ${
-                          student.percentage >= 75
+                          student.percentage >= goodPct
                             ? "bg-emerald-500"
-                            : student.percentage >= 60
+                            : student.percentage >= warnPct
                             ? "bg-kvsr-gold"
                             : "bg-red-500"
                         }`}
@@ -277,9 +281,9 @@ export function AttendanceReport({
                     </div>
                     <span
                       className={`text-sm font-semibold w-12 text-right ${
-                        student.percentage >= 75
+                        student.percentage >= goodPct
                           ? "text-emerald-600"
-                          : student.percentage >= 60
+                          : student.percentage >= warnPct
                           ? "text-kvsr-cta"
                           : "text-red-600"
                       }`}

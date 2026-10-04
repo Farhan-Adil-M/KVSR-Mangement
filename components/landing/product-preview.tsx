@@ -29,7 +29,7 @@ const stats = [
   { label: "Faculty", value: "41", icon: Users, color: "text-kvsr-cta" },
 ];
 
-export function ProductPreview() {
+export function ProductPreview({ institutionShortName }: { institutionShortName: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98, y: 16 }}
@@ -49,7 +49,7 @@ export function ProductPreview() {
           </div>
           <div className="flex-1 text-center">
             <div className="inline-block px-3 py-1 rounded-md bg-kvsr-paper text-xs text-kvsr-muted">
-              kvsrit.edu.in/dashboard
+              {institutionShortName.toLowerCase()}.edu.in/dashboard
             </div>
           </div>
         </div>

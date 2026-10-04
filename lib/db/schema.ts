@@ -8,9 +8,12 @@ import {
   date,
   time,
   numeric,
+  doublePrecision,
   jsonb,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Academic structure
 export const departments = pgTable("departments", {
@@ -148,6 +151,12 @@ export const students = pgTable("students", {
   email: text("email").unique(),
   phone: text("phone"),
   dateOfBirth: date("date_of_birth"),
+  // Set when the student confirms their contact info; locks it from self-edit.
+  contactLockedAt: timestamp("contact_locked_at", { withTimezone: true }),
+  // Faculty/HOD who created this student record (department-scoped enrollment).
+  createdByFacultyId: uuid("created_by_faculty_id").references(() => faculty.id, {
+    onDelete: "set null",
+  }),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
@@ -175,6 +184,9 @@ export const studentEnrollments = pgTable(
       table.sectionId,
       table.academicYearId
     ),
+    uniqueActiveEnrollment: uniqueIndex("unique_active_enrollment")
+      .on(table.studentId, table.academicYearId)
+      .where(sql`is_active`),
   })
 );
 
@@ -258,6 +270,8 @@ export const attendanceSessions = pgTable(
     submittedBy: uuid("submitted_by").references(() => faculty.id, {
       onDelete: "set null",
     }),
+    // Self check-in window anchor; end = openedAt + appSettings.selfCheckinWindowMinutes.
+    selfCheckinOpenedAt: timestamp("self_checkin_opened_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
@@ -305,6 +319,9 @@ export const studentBiometrics = pgTable(
       .references(() => students.id, { onDelete: "cascade" }),
     // 128-d face descriptor from face-api recognition net.
     descriptor: jsonb("descriptor").notNull(),
+    // Reinforcement loop bookkeeping (photo attendance "get smarter" merge).
+    descriptorCount: integer("descriptor_count").notNull().default(1),
+    lastMatchedAt: timestamp("last_matched_at", { withTimezone: true }),
     modelVersion: text("model_version").notNull().default("faceapi-tiny-1"),
     // Server-recorded consent evidence (timestamp + policy version), not client-asserted.
     consentedAt: timestamp("consented_at", { withTimezone: true }),
@@ -525,3 +542,65 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
+
+// Single-row typed app configuration (defaults equal the previous hardcoded values).
+export const appSettings = pgTable("app_settings", {
+  id: integer("id").primaryKey().default(1),
+  // Attendance
+  attendanceGoodPct: integer("attendance_good_pct").notNull().default(75),
+  attendanceWarnPct: integer("attendance_warn_pct").notNull().default(60),
+  matchThreshold: doublePrecision("match_threshold").notNull().default(0.5),
+  confusionBand: doublePrecision("confusion_band").notNull().default(0.15),
+  selfCheckinWindowMinutes: integer("self_checkin_window_minutes").notNull().default(10),
+  photoMin: integer("photo_min").notNull().default(3),
+  photoMax: integer("photo_max").notNull().default(6),
+  scanIntervalMs: integer("scan_interval_ms").notNull().default(1500),
+  identifyScanIntervalMs: integer("identify_scan_interval_ms").notNull().default(1200),
+  // Marks
+  marksGoodPct: integer("marks_good_pct").notNull().default(60),
+  marksWarnPct: integer("marks_warn_pct").notNull().default(40),
+  // Evaluation weights (sum to 1; validated in the action)
+  evalWeightAcademic: doublePrecision("eval_weight_academic").notNull().default(0.5),
+  evalWeightBehaviour: doublePrecision("eval_weight_behaviour").notNull().default(0.2),
+  evalWeightParticipation: doublePrecision("eval_weight_participation").notNull().default(0.3),
+  // Calendar
+  teachingDays: jsonb("teaching_days")
+    .notNull()
+    .default(sql`'["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]'::jsonb`),
+  sessionDays: integer("session_days").notNull().default(7),
+  // Institution identity
+  institutionName: text("institution_name")
+    .notNull()
+    .default("Dr. K.V. Subba Reddy Institute of Technology"),
+  institutionShortName: text("institution_short_name").notNull().default("KVSRIT"),
+  institutionPhone: text("institution_phone").notNull().default("+918518200000"),
+  institutionEmail: text("institution_email").notNull().default("support@kvsrit.edu.in"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// Campus events (admin/HOD managed; audience-filtered views for every role)
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // null departmentId = institution-wide (admin only); otherwise department-scoped
+    departmentId: uuid("department_id").references(() => departments.id, {
+      onDelete: "cascade",
+    }),
+    audience: text("audience").notNull(), // "students" | "faculty" | "both"
+    title: text("title").notNull(),
+    description: text("description"),
+    venue: text("venue"),
+    eventDate: date("event_date").notNull(),
+    startTime: time("start_time"),
+    endTime: time("end_time"),
+    createdByRole: text("created_by_role").notNull(), // "admin" | "hod"
+    createdByFacultyId: uuid("created_by_faculty_id").references(() => faculty.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    eventsDateIdx: index("events_date_idx").on(table.eventDate),
+  })
+);

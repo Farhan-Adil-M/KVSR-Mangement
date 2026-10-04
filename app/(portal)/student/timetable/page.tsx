@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/empty-state";
 import { TimetableGrid } from "@/components/timetable-grid";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import { getTimetableForSection } from "@/lib/db/queries";
+import { getAppConfig } from "@/lib/app-config";
 import { Calendar } from "lucide-react";
 
 export const metadata = { title: "My Timetable | KVSR Management" };
@@ -27,7 +28,10 @@ export default async function StudentTimetablePage() {
     );
   }
 
-  const slots = await getTimetableForSection(ctx.sectionId);
+  const [slots, config] = await Promise.all([
+    getTimetableForSection(ctx.sectionId),
+    getAppConfig(),
+  ]);
 
   return (
     <div className="p-6 sm:p-8">
@@ -42,6 +46,7 @@ export default async function StudentTimetablePage() {
           sectionName={`${ctx.yearLabel}-${ctx.sectionName}`}
           sections={[{ id: ctx.sectionId, name: ctx.sectionName, year: ctx.yearLabel }]}
           selectedSectionId={ctx.sectionId}
+          teachingDays={config.teachingDays}
         />
       </div>
     </div>
