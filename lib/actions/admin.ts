@@ -9,9 +9,12 @@ import {
   departments,
   programs,
   faculty,
+  subjects,
+  timetableSlots,
 } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { requireAdmin, requireHod, getCurrentAcademicYearId } from "@/lib/auth/guards";
+import { getAppConfig } from "@/lib/app-config";
 
 /* ---------------- Notifications (admin-only creation) ---------------- */
 
@@ -67,6 +70,25 @@ const assignFacultySchema = z.object({
   facultyId: z.string().uuid(),
   subjectId: z.string().uuid(),
   sectionId: z.string().uuid(),
+  // Optional weekly schedule created together with the assignment so the
+  // faculty gets a class AND a time, not just access.
+  slots: z
+    .array(
+      z.object({
+        dayOfWeek: z.enum([
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ]),
+        periodId: z.string().uuid(),
+      })
+    )
+    .max(70)
+    .optional(),
 });
 
 export async function assignFacultyToClass(input: unknown) {
@@ -76,18 +98,58 @@ export async function assignFacultyToClass(input: unknown) {
   if (!parsed.success) {
     return { success: false as const, error: "Invalid assignment payload." };
   }
-  const { facultyId, subjectId, sectionId } = parsed.data;
+  const { facultyId, subjectId, sectionId, slots } = parsed.data;
 
   const yearId = await getCurrentAcademicYearId();
   if (!yearId) return { success: false as const, error: "No active academic year." };
+
+  // Validate requested days against the configured teaching days.
+  let teachingDays: string[] | null = null;
+  if (slots && slots.length > 0) {
+    const config = await getAppConfig();
+    teachingDays = config.teachingDays;
+    const invalid = slots.find((s) => !teachingDays!.includes(s.dayOfWeek));
+    if (invalid) {
+      return {
+        success: false as const,
+        error: `${invalid.dayOfWeek} is not a teaching day.`,
+      };
+    }
+  }
 
   try {
     await db
       .insert(facultyAssignments)
       .values({ facultyId, subjectId, sectionId, academicYearId: yearId })
       .onConflictDoNothing();
+
+    if (slots && slots.length > 0) {
+      const [subject] = await db
+        .select({ isLab: subjects.isLab })
+        .from(subjects)
+        .where(eq(subjects.id, subjectId))
+        .limit(1);
+      await db
+        .insert(timetableSlots)
+        .values(
+          slots.map((s) => ({
+            sectionId,
+            academicYearId: yearId,
+            dayOfWeek: s.dayOfWeek,
+            periodId: s.periodId,
+            subjectId,
+            facultyId,
+            isLab: subject?.isLab ?? false,
+          }))
+        )
+        .onConflictDoNothing();
+    }
+
     revalidatePath(`/admin/faculty/${facultyId}`);
     revalidatePath("/faculty/classes");
+    revalidatePath("/faculty/timetable");
+    revalidatePath("/student/timetable");
+    revalidatePath("/admin/timetable");
     return { success: true as const };
   } catch (error) {
     console.error("Failed to assign faculty:", error);
@@ -95,7 +157,10 @@ export async function assignFacultyToClass(input: unknown) {
   }
 }
 
-export async function removeFacultyAssignment(assignmentId: string) {
+export async function removeFacultyAssignment(
+  assignmentId: string,
+  options?: { removeSlots?: boolean }
+) {
   await requireAdmin();
 
   if (!z.string().uuid().safeParse(assignmentId).success) {
@@ -103,9 +168,35 @@ export async function removeFacultyAssignment(assignmentId: string) {
   }
 
   try {
-    await db
+    const [removed] = await db
       .delete(facultyAssignments)
-      .where(eq(facultyAssignments.id, assignmentId));
+      .where(eq(facultyAssignments.id, assignmentId))
+      .returning({
+        facultyId: facultyAssignments.facultyId,
+        subjectId: facultyAssignments.subjectId,
+        sectionId: facultyAssignments.sectionId,
+        academicYearId: facultyAssignments.academicYearId,
+      });
+
+    // Optionally also clear this faculty's scheduled periods for the class.
+    // Note: deleting slots cascades their attendance sessions (history loss),
+    // so the UI must confirm explicitly before requesting this.
+    if (options?.removeSlots && removed) {
+      await db
+        .delete(timetableSlots)
+        .where(
+          and(
+            eq(timetableSlots.facultyId, removed.facultyId),
+            eq(timetableSlots.subjectId, removed.subjectId),
+            eq(timetableSlots.sectionId, removed.sectionId),
+            eq(timetableSlots.academicYearId, removed.academicYearId)
+          )
+        );
+      revalidatePath("/admin/timetable");
+      revalidatePath("/faculty/timetable");
+      revalidatePath("/student/timetable");
+    }
+
     revalidatePath("/admin/faculty");
     return { success: true as const };
   } catch (error) {

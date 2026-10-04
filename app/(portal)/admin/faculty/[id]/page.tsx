@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
-import { DashboardHeader } from "@/components/dashboard-header";
-import { getFacultyList, getFacultySchedule } from "@/lib/db/queries";
+import { PageHeader } from "@/components/page-header";
+import { getFacultyList, getFacultySchedule, getPeriods } from "@/lib/db/queries";
 import { getFacultyAssignments, requireAdmin } from "@/lib/auth/guards";
 import { getAppConfig } from "@/lib/app-config";
 import { AssignmentManager } from "@/components/assignment-manager";
 import { db } from "@/lib/db";
 import { subjects, sections, studyYears } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, Mail, Phone, Calendar, Clock, ArrowLeft } from "lucide-react";
+import { Crown, Mail, Phone, Calendar, Clock } from "lucide-react";
 
 export async function generateMetadata() {
   const config = await getAppConfig();
@@ -33,190 +32,241 @@ export default async function FacultyDetailPage({
     notFound();
   }
 
-  const [schedule, assignments, subjectRows, sectionRows, config] = await Promise.all([
-    getFacultySchedule(member.id),
-    getFacultyAssignments(member.id),
-    db
-      .select({ id: subjects.id, name: subjects.name })
-      .from(subjects)
-      .orderBy(asc(subjects.name)),
-    db
-      .select({
-        id: sections.id,
-        name: sections.name,
-        year: studyYears.label,
-      })
-      .from(sections)
-      .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
-      .orderBy(asc(studyYears.yearNumber), asc(sections.name)),
-    getAppConfig(),
-  ]);
+  const [schedule, assignments, subjectRows, sectionRows, periods, config] =
+    await Promise.all([
+      getFacultySchedule(member.id),
+      getFacultyAssignments(member.id),
+      db
+        .select({ id: subjects.id, name: subjects.name })
+        .from(subjects)
+        .orderBy(asc(subjects.name)),
+      db
+        .select({
+          id: sections.id,
+          name: sections.name,
+          year: studyYears.label,
+        })
+        .from(sections)
+        .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
+        .orderBy(asc(studyYears.yearNumber), asc(sections.name)),
+      getPeriods(),
+      getAppConfig(),
+    ]);
 
-  const scheduleByDay = config.teachingDays.map((day) => ({
-    day,
-    slots: schedule.filter((s) => s.dayOfWeek === day),
+  const slotByCell = new Map<string, (typeof schedule)[number]>();
+  for (const slot of schedule) {
+    slotByCell.set(`${slot.dayOfWeek}|${slot.periodNumber}`, slot);
+  }
+
+  const slotsByAssignment = assignments.map((a) => ({
+    assignmentId: a.assignmentId,
+    subjectId: a.subjectId,
+    subjectName: a.subjectName,
+    sectionId: a.sectionId,
+    sectionName: a.sectionName,
+    yearLabel: a.yearLabel,
+    periods: schedule
+      .filter(
+        (s) => s.subject === a.subjectName && s.section === a.sectionName
+      )
+      .map((s) => ({
+        day: s.dayOfWeek,
+        periodNumber: s.periodNumber,
+        time: `${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)}`,
+      }))
+      .sort((x, y) => x.periodNumber - y.periodNumber),
   }));
 
-  return (
-    <div className="p-6 sm:p-8">
-      <div className="max-w-7xl mx-auto">
-        <a
-          href="/admin/faculty"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-kvsr-ink transition-colors mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to faculty
-        </a>
+  const initials = member.fullName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
-        <DashboardHeader
+  return (
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <PageHeader
           title={member.fullName}
           subtitle={member.department || `${config.institutionShortName} Faculty`}
+          breadcrumbs={[{ label: "Faculty", href: "/admin/faculty" }]}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Profile card */}
-          <div>
-            <Card className="border border-kvsr-soft/80 bg-white shadow-sm h-full">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-2xl shrink-0">
-                    {member.fullName
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl text-kvsr-navy">
-                      {member.fullName}
-                    </CardTitle>
-                    {member.isHod && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-kvsr-gold/15 text-kvsr-cta text-xs font-semibold mt-1">
-                        <Crown className="w-3 h-3" />
-                        Head of Department
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {member.email && (
-                  <a
-                    href={`mailto:${member.email}`}
-                    className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
-                  >
-                    <Mail className="w-4 h-4" />
-                    {member.email}
-                  </a>
+        {/* Profile summary */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-kvsr-soft bg-white shadow-sm p-5 lg:col-span-2">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-xl shrink-0">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-kvsr-navy text-lg truncate">
+                  {member.fullName}
+                </p>
+                {member.isHod && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-kvsr-gold/15 text-kvsr-cta text-xs font-semibold mt-1">
+                    <Crown className="w-3 h-3" />
+                    Head of Department
+                  </span>
                 )}
-                {member.phone && (
-                  <a
-                    href={`tel:${member.phone}`}
-                    className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
-                  >
-                    <Phone className="w-4 h-4" />
-                    {member.phone}
-                  </a>
-                )}
-                <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  {schedule.length} scheduled slots per week
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {member.email && (
+                <a
+                  href={`mailto:${member.email}`}
+                  className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
+                >
+                  <Mail className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{member.email}</span>
+                </a>
+              )}
+              {member.phone && (
+                <a
+                  href={`tel:${member.phone}`}
+                  className="flex items-center gap-2.5 text-sm text-muted-foreground hover:text-kvsr-cta transition-colors"
+                >
+                  <Phone className="w-4 h-4 shrink-0" />
+                  {member.phone}
+                </a>
+              )}
+            </div>
           </div>
-
-          {/* Schedule */}
-          <div className="lg:col-span-2">
-            <Card className="border border-kvsr-soft/80 bg-white shadow-sm h-full">
-              <CardHeader>
-                <CardTitle className="text-lg text-kvsr-navy flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-kvsr-orange" />
-                  Weekly Schedule
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-5">
-                  {scheduleByDay.map((daySchedule) =>
-                    daySchedule.slots.length === 0 ? null : (
-                      <div key={daySchedule.day}>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                          {daySchedule.day}
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {daySchedule.slots.map((slot) => (
-                            <div
-                              key={slot.id}
-                              className="p-4 rounded-xl border border-kvsr-soft bg-kvsr-navy/[0.02]"
-                            >
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <span className="font-semibold text-kvsr-ink text-sm">
-                                  {slot.subject}
-                                </span>
-                                {slot.isLab && (
-                                  <span className="px-2 py-0.5 rounded-full bg-kvsr-orange/10 text-kvsr-cta text-xs font-medium">
-                                    Lab
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                P{slot.periodNumber} · {slot.startTime.slice(0, 5)} -{" "}
-                                {slot.endTime.slice(0, 5)}
-                              </p>
-                              <p className="text-xs text-kvsr-cta mt-1 font-medium">
-                                {slot.year}-{slot.section}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  )}
-                  {schedule.length === 0 && (
-                    <p className="text-muted-foreground text-center py-8">
-                      No scheduled slots for this faculty member.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="rounded-2xl border border-kvsr-soft bg-white shadow-sm p-5 flex flex-col justify-center">
+            <p className="text-3xl font-bold text-kvsr-navy">{assignments.length}</p>
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
+              Class assignments
+            </p>
+          </div>
+          <div className="rounded-2xl border border-kvsr-soft bg-white shadow-sm p-5 flex flex-col justify-center">
+            <p className="text-3xl font-bold text-kvsr-navy">{schedule.length}</p>
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              Periods per week
+            </p>
           </div>
         </div>
+
+        {/* Weekly timetable grid: periods × days */}
+        <section className="rounded-2xl border border-kvsr-soft bg-white shadow-sm overflow-hidden">
+          <div className="px-5 pt-5 pb-4 border-b border-kvsr-soft/70">
+            <h2 className="text-lg font-semibold text-kvsr-navy flex items-center gap-2">
+              <Clock className="w-5 h-5 text-kvsr-orange" />
+              Weekly Schedule
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {schedule.length} periods across {config.teachingDays.length} teaching days
+            </p>
+          </div>
+          {schedule.length === 0 ? (
+            <p className="text-muted-foreground text-center py-10 text-sm">
+              No scheduled periods yet — assign classes with periods below.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm min-w-[720px]">
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-kvsr-navy/[0.03] px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-kvsr-soft min-w-[110px]">
+                      Period
+                    </th>
+                    {config.teachingDays.map((day) => (
+                      <th
+                        key={day}
+                        className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-kvsr-soft min-w-[140px]"
+                      >
+                        {day}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {periods.map((period) => (
+                    <tr key={period.id} className="border-b border-kvsr-soft/60 last:border-0">
+                      <th
+                        scope="row"
+                        className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left font-medium text-kvsr-ink border-r border-kvsr-soft/60 align-top"
+                      >
+                        <span className="block text-sm">P{period.periodNumber}</span>
+                        <span className="block text-xs text-muted-foreground font-normal">
+                          {period.startTime.slice(0, 5)}–{period.endTime.slice(0, 5)}
+                        </span>
+                      </th>
+                      {config.teachingDays.map((day) => {
+                        const slot = slotByCell.get(`${day}|${period.periodNumber}`);
+                        return (
+                          <td key={`${day}-${period.id}`} className="px-2 py-2 align-top">
+                            {slot ? (
+                              <div className="rounded-xl border border-kvsr-soft bg-kvsr-navy/[0.03] px-3 py-2 h-full">
+                                <div className="flex items-start justify-between gap-1.5">
+                                  <span className="font-semibold text-kvsr-ink text-xs leading-snug">
+                                    {slot.subject}
+                                  </span>
+                                  {slot.isLab && (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-kvsr-orange/10 text-kvsr-cta text-[10px] font-semibold shrink-0">
+                                      Lab
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-kvsr-cta font-medium mt-1">
+                                  {slot.year}-{slot.section}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="rounded-xl border border-dashed border-kvsr-soft/60 px-3 py-2 h-full flex items-center">
+                                <span className="text-kvsr-muted/40 text-xs">—</span>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         {/* Class assignments management (admin-only) */}
-        <div className="mt-6">
-          <Card className="border border-kvsr-soft/80 bg-white shadow-sm">
-            <CardHeader className="pb-4 pt-6 px-6">
-              <CardTitle className="text-lg text-kvsr-navy flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-kvsr-orange" />
-                Class Assignments
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Controls which subject + section classes this faculty member can
-                access, mark attendance for, and evaluate.
-              </p>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              <AssignmentManager
-                facultyId={member.id}
-                existing={assignments.map((a) => ({
-                  assignmentId: a.assignmentId,
-                  subjectId: a.subjectId,
-                  subjectName: a.subjectName,
-                  sectionId: a.sectionId,
-                  sectionName: a.sectionName,
-                  yearLabel: a.yearLabel,
-                }))}
-                subjects={subjectRows.map((s) => ({ id: s.id, label: s.name }))}
-                sections={sectionRows.map((s) => ({
-                  id: s.id,
-                  label: `${s.year}-${s.name}`,
-                }))}
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <section className="rounded-2xl border border-kvsr-soft bg-white shadow-sm">
+          <div className="px-5 pt-5 pb-4 border-b border-kvsr-soft/70">
+            <h2 className="text-lg font-semibold text-kvsr-navy flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-kvsr-orange" />
+              Class Assignments
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Grant class access and schedule their weekly periods in one step.
+            </p>
+          </div>
+          <div className="p-5">
+            <AssignmentManager
+              facultyId={member.id}
+              existing={assignments.map((a) => ({
+                assignmentId: a.assignmentId,
+                subjectId: a.subjectId,
+                subjectName: a.subjectName,
+                sectionId: a.sectionId,
+                sectionName: a.sectionName,
+                yearLabel: a.yearLabel,
+              }))}
+              subjects={subjectRows.map((s) => ({ id: s.id, label: s.name }))}
+              sections={sectionRows.map((s) => ({
+                id: s.id,
+                label: `${s.year}-${s.name}`,
+              }))}
+              periods={periods.map((p) => ({
+                id: p.id,
+                periodNumber: p.periodNumber,
+                time: `${p.startTime.slice(0, 5)}–${p.endTime.slice(0, 5)}`,
+              }))}
+              teachingDays={config.teachingDays}
+              slotsByAssignment={slotsByAssignment}
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
