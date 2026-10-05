@@ -22,25 +22,30 @@ export function Modal({
   className,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose without making it an effect dependency —
+  // otherwise the effect re-runs on every parent render and the
+  // dialog .focus() below steals focus from the input being typed in.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKeyDown);
     // Lock body scroll while open
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    // Move focus into the dialog
+    // Move focus into the dialog (only on open, not on every re-render)
     dialogRef.current?.focus();
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = prevOverflow;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
