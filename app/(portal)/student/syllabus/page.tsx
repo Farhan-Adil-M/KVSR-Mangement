@@ -2,7 +2,8 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { getStudentContext, requireStudent } from "@/lib/auth/guards";
 import { getStudentSyllabus } from "@/lib/db/portal-queries";
-import { BookOpen } from "lucide-react";
+import { getSectionResources } from "@/lib/actions/resources";
+import { BookOpen, FileText } from "lucide-react";
 
 export const metadata = { title: "Syllabus | KVSR Management" };
 
@@ -25,7 +26,11 @@ export default async function StudentSyllabusPage() {
     );
   }
 
-  const subjects = await getStudentSyllabus(ctx.sectionId);
+  const [subjects, resources] = await Promise.all([
+    getStudentSyllabus(ctx.sectionId),
+    getSectionResources(ctx.sectionId),
+  ]);
+  const syllabusFiles = resources.filter((r) => r.type === "syllabus");
   const withUnits = subjects.filter((s) => s.units.length > 0);
 
   return (
@@ -82,6 +87,44 @@ export default async function StudentSyllabusPage() {
               </p>
             )}
           </div>
+        )}
+
+        {/* Uploaded syllabus documents (from Resources) */}
+        {syllabusFiles.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Syllabus documents
+            </h2>
+            <div className="bg-white rounded-2xl border border-kvsr-soft shadow-sm divide-y divide-kvsr-soft overflow-hidden">
+              {syllabusFiles.map((r) => (
+                <div
+                  key={r.id}
+                  className="px-5 py-4 flex items-center gap-4 hover:bg-kvsr-navy/[0.02]"
+                >
+                  <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-kvsr-navy/[0.06] text-kvsr-navy shrink-0">
+                    <FileText className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-kvsr-ink truncate">{r.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {r.subjectName ? `${r.subjectName} · ` : ""}
+                      {r.fileName ?? "Link"}
+                    </p>
+                  </div>
+                  {r.hasFile && (
+                    <a
+                      href={`/api/resources/${r.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3.5 min-h-[44px] rounded-xl border border-kvsr-soft bg-white text-sm font-medium text-kvsr-ink hover:border-kvsr-navy/40 transition-colors"
+                    >
+                      View PDF
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </div>
