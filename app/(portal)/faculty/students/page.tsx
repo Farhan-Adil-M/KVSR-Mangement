@@ -1,6 +1,7 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { EmptyState } from "@/components/empty-state";
 import { FacultyStudentHub } from "@/components/faculty-student-hub";
+import Link from "next/link";
 import {
   getDepartmentSections,
   getDepartmentStudents,
@@ -83,10 +84,12 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
     );
   }
 
-  // Contact info for visible students only.
-  const contact =
+  // Contact info for visible students; biometric + evaluation status for the
+  // selected section. All three reads are independent of each other, so they
+  // share one round trip instead of two sequential ones.
+  const contactPromise =
     visible.length > 0
-      ? await db
+      ? db
           .select({
             id: studentsTable.id,
             email: studentsTable.email,
@@ -94,8 +97,47 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
           })
           .from(studentsTable)
           .where(inArray(studentsTable.id, visible.map((s) => s.id)))
-      : [];
+      : Promise.resolve([]);
+
+  const extraPromise: Promise<{
+    biometricEnrolledIds: string[];
+    evaluations: Record<
+      string,
+      {
+        academicPerformance: number;
+        behaviour: number;
+        participation: number;
+        comments: string | null;
+      }
+    >;
+  }> = selectedSection
+    ? (async () => {
+        const [bioResult, evaluationRows] = await Promise.all([
+          getSectionBiometrics(selectedSection),
+          getFacultySectionEvaluations(session.id, selectedSection),
+        ]);
+        return {
+          biometricEnrolledIds: bioResult.ok
+            ? bioResult.biometrics.map((b) => b.studentId)
+            : [],
+          evaluations: Object.fromEntries(
+            evaluationRows.map((e) => [
+              e.studentId,
+              {
+                academicPerformance: e.academicPerformance,
+                behaviour: e.behaviour,
+                participation: e.participation,
+                comments: e.comments,
+              },
+            ])
+          ),
+        };
+      })()
+    : Promise.resolve({ biometricEnrolledIds: [], evaluations: {} });
+
+  const [contact, extras] = await Promise.all([contactPromise, extraPromise]);
   const contactMap = new Map(contact.map((c) => [c.id, c]));
+  const { biometricEnrolledIds, evaluations } = extras;
 
   const hubStudents = visible.map((s) => ({
     id: s.id,
@@ -107,38 +149,6 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
     email: contactMap.get(s.id)?.email ?? null,
     phone: contactMap.get(s.id)?.phone ?? null,
   }));
-
-  // For the SELECTED section only: biometric enrollment status + evaluations.
-  let biometricEnrolledIds: string[] = [];
-  let evaluations: Record<
-    string,
-    {
-      academicPerformance: number;
-      behaviour: number;
-      participation: number;
-      comments: string | null;
-    }
-  > = {};
-  if (selectedSection) {
-    const [bioResult, evaluationRows] = await Promise.all([
-      getSectionBiometrics(selectedSection),
-      getFacultySectionEvaluations(session.id, selectedSection),
-    ]);
-    if (bioResult.ok) {
-      biometricEnrolledIds = bioResult.biometrics.map((b) => b.studentId);
-    }
-    evaluations = Object.fromEntries(
-      evaluationRows.map((e) => [
-        e.studentId,
-        {
-          academicPerformance: e.academicPerformance,
-          behaviour: e.behaviour,
-          participation: e.participation,
-          comments: e.comments,
-        },
-      ])
-    );
-  }
 
   return (
     <div className="p-6 sm:p-8">
@@ -159,8 +169,9 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
               Class
             </p>
             <div className="flex flex-wrap gap-2">
-              <a
+              <Link
                 href={rawQ ? `/faculty/students?q=${encodeURIComponent(rawQ)}` : "/faculty/students"}
+                aria-current={!selectedSection ? "page" : undefined}
                 className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   !selectedSection
                     ? "bg-kvsr-navy text-white shadow-md"
@@ -168,15 +179,16 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
                 }`}
               >
                 {isHod ? "All sections" : "All my classes"}
-              </a>
+              </Link>
               {sectionsList.map((s) => {
                 const sp = new URLSearchParams();
                 if (rawQ) sp.set("q", rawQ);
                 sp.set("section", s.id);
                 return (
-                  <a
+                  <Link
                     key={s.id}
                     href={`/faculty/students?${sp.toString()}`}
+                    aria-current={selectedSection === s.id ? "page" : undefined}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                       selectedSection === s.id
                         ? "bg-kvsr-navy text-white shadow-md"
@@ -184,7 +196,7 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
                     }`}
                   >
                     {s.label}
-                  </a>
+                  </Link>
                 );
               })}
             </div>
@@ -211,13 +223,13 @@ export default async function FacultyStudentsPage({ searchParams }: PageProps) {
               Search
             </button>
             {(rawQ || selectedSection) && (
-              <a
+              <Link
                 href="/faculty/students"
                 className="px-4 py-2.5 border border-kvsr-soft rounded-xl text-sm font-medium text-muted-foreground hover:bg-kvsr-navy/[0.03] transition-colors flex items-center justify-center gap-2"
               >
                 <X className="w-4 h-4" />
                 Clear
-              </a>
+              </Link>
             )}
           </form>
         </div>

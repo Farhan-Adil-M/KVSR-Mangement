@@ -16,12 +16,24 @@ export default async function AttendanceReportsPage({
   searchParams,
 }: AttendanceReportsPageProps) {
   await requireAdmin();
-  const [sections, config] = await Promise.all([getSections(), getAppConfig()]);
-  const selectedSectionId = searchParams.section || sections[0]?.id;
 
-  const report = selectedSectionId
-    ? await getAttendanceReportBySection(selectedSectionId)
-    : [];
+  // With an explicit ?section= the report query is independent of the section
+  // list, so it starts immediately (one round trip instead of two). Without a
+  // param it chains off the sections query to pick the first section.
+  const sectionsPromise = getSections();
+  const reportPromise = searchParams.section
+    ? getAttendanceReportBySection(searchParams.section)
+    : sectionsPromise.then((first) =>
+        first[0]?.id ? getAttendanceReportBySection(first[0].id) : []
+      );
+
+  const [sections, config, report] = await Promise.all([
+    sectionsPromise,
+    getAppConfig(),
+    reportPromise,
+  ]);
+
+  const selectedSectionId = searchParams.section || sections[0]?.id;
 
   return (
     <div className="p-6 sm:p-8">

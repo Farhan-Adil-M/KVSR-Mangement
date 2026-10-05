@@ -63,15 +63,24 @@ export const academicYears = pgTable("academic_years", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-export const studyYears = pgTable("study_years", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  programId: uuid("program_id")
-    .notNull()
-    .references(() => programs.id, { onDelete: "cascade" }),
-  yearNumber: integer("year_number").notNull(),
-  label: text("label").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-});
+export const studyYears = pgTable(
+  "study_years",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id, { onDelete: "cascade" }),
+    yearNumber: integer("year_number").notNull(),
+    label: text("label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    uniqueProgramStudyYear: uniqueIndex("unique_program_study_year").on(
+      table.programId,
+      table.yearNumber
+    ),
+  })
+);
 
 // People and subjects
 export const faculty = pgTable("faculty", {
@@ -602,5 +611,92 @@ export const events = pgTable(
   },
   (table) => ({
     eventsDateIdx: index("events_date_idx").on(table.eventDate),
+  })
+);
+
+// Class representatives (CRs) per section — max 3 enforced in the action layer
+export const sectionCrs = pgTable(
+  "section_crs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => sections.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    uniqueSectionCr: uniqueIndex("unique_section_cr").on(
+      table.sectionId,
+      table.studentId
+    ),
+  })
+);
+
+// Section resources (assignments/exams/syllabus/other) with inline base64 files
+export const resources = pgTable(
+  "resources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => sections.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id").references(() => subjects.id, {
+      onDelete: "set null",
+    }),
+    title: text("title").notNull(),
+    description: text("description"),
+    type: text("type").notNull(), // "assignment" | "exam" | "syllabus" | "other"
+    fileData: text("file_data"),
+    fileName: text("file_name"),
+    fileMime: text("file_mime"),
+    uploadedByRole: text("uploaded_by_role").notNull(), // "faculty" | "hod" | "admin" | "student"
+    uploadedByFacultyId: uuid("uploaded_by_faculty_id").references(() => faculty.id, {
+      onDelete: "set null",
+    }),
+    uploadedByStudentId: uuid("uploaded_by_student_id").references(() => students.id, {
+      onDelete: "cascade",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    resourcesSectionIdx: index("resources_section_idx").on(table.sectionId),
+  })
+);
+
+// Student ratings of faculty per subject (1-5), one per student/faculty/subject/year
+export const facultyRatings = pgTable(
+  "faculty_ratings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => students.id, { onDelete: "cascade" }),
+    facultyId: uuid("faculty_id")
+      .notNull()
+      .references(() => faculty.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => sections.id, { onDelete: "cascade" }),
+    academicYearId: uuid("academic_year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    uniqueStudentFacultyRating: uniqueIndex("unique_student_faculty_rating").on(
+      table.studentId,
+      table.facultyId,
+      table.subjectId,
+      table.academicYearId
+    ),
   })
 );

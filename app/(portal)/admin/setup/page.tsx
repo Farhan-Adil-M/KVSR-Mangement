@@ -77,9 +77,9 @@ export default async function SetupIndexPage() {
       countLabel: "subjects",
     },
     {
-      href: "/admin/setup/timetable",
+      href: "/admin/timetable",
       icon: Calendar,
-      title: "Timetable slots",
+      title: "Timetables",
       detail: "Weekly slot editor per section",
       count: stats.slots,
       countLabel: "slots",

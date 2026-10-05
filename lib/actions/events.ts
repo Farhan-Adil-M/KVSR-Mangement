@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { events, faculty } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession, type SessionUser } from "@/lib/auth/session";
+import { planEventLocally, type EventPlan } from "@/lib/event-planner";
 
 export type EventActionResult = { success: true } | { success: false; error: string };
 
@@ -241,5 +242,43 @@ export async function deleteEvent(eventId: string): Promise<EventActionResult> {
   } catch (error) {
     console.error("Failed to delete event:", error);
     return { success: false, error: "Failed to delete event." };
+  }
+}
+
+/* ---------------- Event budget planner (staff-only wrapper) ---------------- */
+
+const planEventSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(4000).optional().nullable(),
+  attendees: z.number().int().min(10).max(5000),
+  budget: z.number().int().min(1000).max(10_000_000),
+});
+
+export type PlanEventResult =
+  | { ok: true; eventType: string; plans: EventPlan[] }
+  | { ok: false; error: string };
+
+/** Staff-only wrapper around the pure planner (admin/hod/faculty). */
+export async function planEvent(input: unknown): Promise<PlanEventResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not authenticated." };
+  if (session.role !== "admin" && session.role !== "hod" && session.role !== "faculty") {
+    return { ok: false, error: "Not authorized." };
+  }
+
+  const parsed = planEventSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Invalid event planner payload." };
+
+  try {
+    const result = planEventLocally({
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      attendees: parsed.data.attendees,
+      budget: parsed.data.budget,
+    });
+    return { ok: true, eventType: result.eventType, plans: result.plans };
+  } catch (error) {
+    console.error("Failed to plan event:", error);
+    return { ok: false, error: "Failed to plan event." };
   }
 }

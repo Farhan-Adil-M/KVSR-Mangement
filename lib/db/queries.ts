@@ -368,35 +368,180 @@ export async function getFacultySchedule(facultyId: string) {
     );
 }
 
-export async function getAttendanceReportBySection(sectionId: string) {
-  const currentYear = await getCurrentAcademicYear();
-  if (!currentYear) return [];
+export interface AttendanceReportRow {
+  studentId: string;
+  rollNumber: string;
+  fullName: string;
+  subjectId: string;
+  subject: string;
+  classesHeld: number;
+  classesAttended: number;
+}
 
-  return db
-    .select({
-      studentId: students.id,
-      rollNumber: students.rollNumber,
-      fullName: students.fullName,
-      subject: subjects.name,
-      subjectId: subjects.id,
-      classesHeld: studentAttendanceSummaries.classesHeld,
-      classesAttended: studentAttendanceSummaries.classesAttended,
-    })
-    .from(studentAttendanceSummaries)
-    .innerJoin(students, eq(studentAttendanceSummaries.studentId, students.id))
-    .innerJoin(subjects, eq(studentAttendanceSummaries.subjectId, subjects.id))
-    .innerJoin(
-      studentEnrollments,
-      eq(studentEnrollments.studentId, students.id)
+/**
+ * LIVE per (student, subject) attendance for a section, aggregated from
+ * attendance_records ⋈ attendance_sessions (submitted rosters only, current
+ * year). Subjects come from the section's active timetable slots (so subjects
+ * with zero sessions still appear); students from active enrollments. Every
+ * (student, subject) pair appears — 0/0 when there are no records.
+ */
+export async function getAttendanceReportBySection(
+  sectionId: string
+): Promise<AttendanceReportRow[]> {
+  const rows = (await rawSql`
+    WITH current_year AS (
+      SELECT id FROM academic_years WHERE is_current = true
+    ),
+    section_subjects AS (
+      SELECT DISTINCT sub.id AS subject_id, sub.name AS subject
+      FROM timetable_slots ts
+      JOIN subjects sub ON sub.id = ts.subject_id
+      WHERE ts.section_id = ${sectionId}
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+        AND ts.is_active = true
+    ),
+    section_students AS (
+      SELECT st.id AS student_id, st.roll_number, st.full_name
+      FROM student_enrollments se
+      JOIN students st ON st.id = se.student_id
+      WHERE se.section_id = ${sectionId}
+        AND se.academic_year_id = (SELECT id FROM current_year)
+        AND se.is_active = true
+    ),
+    subject_held AS (
+      SELECT sess.subject_id, COUNT(*) AS held
+      FROM attendance_sessions sess
+      JOIN timetable_slots ts ON ts.id = sess.timetable_slot_id
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+      WHERE sess.section_id = ${sectionId}
+        AND sess.submitted_at IS NOT NULL
+      GROUP BY sess.subject_id
+    ),
+    subject_attended AS (
+      SELECT sess.subject_id, r.student_id, COUNT(*) AS attended
+      FROM attendance_sessions sess
+      JOIN timetable_slots ts ON ts.id = sess.timetable_slot_id
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+      JOIN attendance_records r
+        ON r.session_id = sess.id AND r.status = 'present'
+      WHERE sess.section_id = ${sectionId}
+        AND sess.submitted_at IS NOT NULL
+      GROUP BY sess.subject_id, r.student_id
     )
-    .where(
-      and(
-        eq(studentEnrollments.sectionId, sectionId),
-        eq(studentEnrollments.academicYearId, currentYear.id),
-        eq(studentEnrollments.isActive, true)
-      )
+    SELECT st.student_id AS "studentId", st.roll_number AS "rollNumber",
+           st.full_name AS "fullName",
+           sub.subject_id AS "subjectId", sub.subject,
+           COALESCE(h.held, 0) AS "classesHeld",
+           COALESCE(a.attended, 0) AS "classesAttended"
+    FROM section_students st
+    CROSS JOIN section_subjects sub
+    LEFT JOIN subject_held h ON h.subject_id = sub.subject_id
+    LEFT JOIN subject_attended a
+      ON a.subject_id = sub.subject_id AND a.student_id = st.student_id
+    ORDER BY st.roll_number, sub.subject
+  `) as unknown as {
+    studentId: string;
+    rollNumber: string;
+    fullName: string;
+    subjectId: string;
+    subject: string;
+    classesHeld: string | number;
+    classesAttended: string | number;
+  }[];
+
+  // neon-http returns bigint counts as strings — coerce before arithmetic.
+  return rows.map((r) => ({
+    studentId: r.studentId,
+    rollNumber: r.rollNumber,
+    fullName: r.fullName,
+    subjectId: r.subjectId,
+    subject: r.subject,
+    classesHeld: Number(r.classesHeld) || 0,
+    classesAttended: Number(r.classesAttended) || 0,
+  }));
+}
+
+/**
+ * Same live aggregation for ONE student: every subject in the section's active
+ * timetable with held/attended counts (0 defaults). Empty when the student is
+ * not actively enrolled in the section for the current year.
+ */
+export async function getStudentSubjectAttendance(
+  studentId: string,
+  sectionId: string
+): Promise<AttendanceReportRow[]> {
+  const rows = (await rawSql`
+    WITH current_year AS (
+      SELECT id FROM academic_years WHERE is_current = true
+    ),
+    section_subjects AS (
+      SELECT DISTINCT sub.id AS subject_id, sub.name AS subject
+      FROM timetable_slots ts
+      JOIN subjects sub ON sub.id = ts.subject_id
+      WHERE ts.section_id = ${sectionId}
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+        AND ts.is_active = true
+    ),
+    me AS (
+      SELECT st.id AS student_id, st.roll_number, st.full_name
+      FROM student_enrollments se
+      JOIN students st ON st.id = se.student_id
+      WHERE se.student_id = ${studentId}
+        AND se.section_id = ${sectionId}
+        AND se.academic_year_id = (SELECT id FROM current_year)
+        AND se.is_active = true
+      LIMIT 1
+    ),
+    subject_held AS (
+      SELECT sess.subject_id, COUNT(*) AS held
+      FROM attendance_sessions sess
+      JOIN timetable_slots ts ON ts.id = sess.timetable_slot_id
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+      WHERE sess.section_id = ${sectionId}
+        AND sess.submitted_at IS NOT NULL
+      GROUP BY sess.subject_id
+    ),
+    subject_attended AS (
+      SELECT sess.subject_id, COUNT(*) AS attended
+      FROM attendance_sessions sess
+      JOIN timetable_slots ts ON ts.id = sess.timetable_slot_id
+        AND ts.academic_year_id = (SELECT id FROM current_year)
+      JOIN attendance_records r
+        ON r.session_id = sess.id AND r.status = 'present'
+      WHERE sess.section_id = ${sectionId}
+        AND sess.submitted_at IS NOT NULL
+        AND r.student_id = ${studentId}
+      GROUP BY sess.subject_id
     )
-    .orderBy(asc(students.rollNumber), asc(subjects.name));
+    SELECT me.student_id AS "studentId", me.roll_number AS "rollNumber",
+           me.full_name AS "fullName",
+           sub.subject_id AS "subjectId", sub.subject,
+           COALESCE(h.held, 0) AS "classesHeld",
+           COALESCE(a.attended, 0) AS "classesAttended"
+    FROM me
+    CROSS JOIN section_subjects sub
+    LEFT JOIN subject_held h ON h.subject_id = sub.subject_id
+    LEFT JOIN subject_attended a ON a.subject_id = sub.subject_id
+    ORDER BY sub.subject
+  `) as unknown as {
+    studentId: string;
+    rollNumber: string;
+    fullName: string;
+    subjectId: string;
+    subject: string;
+    classesHeld: string | number;
+    classesAttended: string | number;
+  }[];
+
+  return rows.map((r) => ({
+    studentId: r.studentId,
+    rollNumber: r.rollNumber,
+    fullName: r.fullName,
+    subjectId: r.subjectId,
+    subject: r.subject,
+    classesHeld: Number(r.classesHeld) || 0,
+    classesAttended: Number(r.classesAttended) || 0,
+  }));
 }
 
 export interface OpenSelfCheckin {
@@ -540,4 +685,93 @@ export async function getAcademicYearsList() {
     })
     .from(academicYears)
     .orderBy(desc(academicYears.startDate));
+}
+
+/* ---------------- Admin exams & study years ---------------- */
+
+export interface ExamAdminRow {
+  id: string;
+  title: string;
+  examDate: string;
+  startTime: string | null;
+  instructions: string | null;
+  subjectName: string;
+  /** Coalesced to "Year-wide" when the exam has no section. */
+  sectionName: string;
+  studyYearLabel: string | null;
+  academicYearName: string;
+  isCurrentYear: boolean;
+}
+
+/** All exams for the admin exams page: current year first, then examDate desc. */
+export async function getExamsAdmin(): Promise<ExamAdminRow[]> {
+  const rows = (await rawSql`
+    SELECT e.id, e.title,
+           to_char(e.exam_date, 'YYYY-MM-DD') AS "examDate",
+           to_char(e.start_time, 'HH24:MI') AS "startTime",
+           e.instructions,
+           sub.name AS "subjectName",
+           COALESCE(sec.name, 'Year-wide') AS "sectionName",
+           sy.label AS "studyYearLabel",
+           ay.name AS "academicYearName",
+           ay.is_current AS "isCurrentYear"
+    FROM exams e
+    JOIN subjects sub ON sub.id = e.subject_id
+    JOIN academic_years ay ON ay.id = e.academic_year_id
+    LEFT JOIN sections sec ON sec.id = e.section_id
+    LEFT JOIN study_years sy ON sy.id = COALESCE(e.study_year_id, sec.study_year_id)
+    ORDER BY ay.is_current DESC, e.exam_date DESC, e.start_time NULLS LAST, e.created_at DESC
+  `) as unknown as ExamAdminRow[];
+
+  return rows;
+}
+
+export interface StudyYearAdminRow {
+  id: string;
+  yearNumber: number;
+  label: string;
+}
+
+export interface ProgramWithStudyYears {
+  id: string;
+  name: string;
+  departmentName: string | null;
+  studyYears: StudyYearAdminRow[];
+}
+
+/** Programs with their study years, grouped for the admin study-years UI. */
+export async function getStudyYearsAdmin(): Promise<ProgramWithStudyYears[]> {
+  const programRows = await db
+    .select({
+      id: programs.id,
+      name: programs.name,
+      departmentName: departments.name,
+    })
+    .from(programs)
+    .leftJoin(departments, eq(programs.departmentId, departments.id))
+    .orderBy(asc(departments.name), asc(programs.name));
+
+  const yearRows = await db
+    .select({
+      id: studyYears.id,
+      programId: studyYears.programId,
+      yearNumber: studyYears.yearNumber,
+      label: studyYears.label,
+    })
+    .from(studyYears)
+    .orderBy(asc(studyYears.yearNumber), asc(studyYears.label));
+
+  const yearsByProgram = new Map<string, StudyYearAdminRow[]>();
+  for (const year of yearRows) {
+    const list = yearsByProgram.get(year.programId) ?? [];
+    list.push({ id: year.id, yearNumber: year.yearNumber, label: year.label });
+    yearsByProgram.set(year.programId, list);
+  }
+
+  return programRows.map((program) => ({
+    id: program.id,
+    name: program.name,
+    departmentName: program.departmentName ?? null,
+    studyYears: yearsByProgram.get(program.id) ?? [],
+  }));
 }

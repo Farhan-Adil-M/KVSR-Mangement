@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Save, Search } from "lucide-react";
 import { saveMarks } from "@/lib/actions/teaching";
+import { MAX_MARKS_BY_EXAM_TYPE, defaultMaxMarks } from "@/lib/marks";
 
 interface StudentRow {
   id: string;
@@ -17,6 +18,8 @@ const EXAM_TYPES = [
   { value: "external", label: "External" },
   { value: "other", label: "Other" },
 ];
+
+const JNTUA_HINT = `Auto-filled from JNTUA pattern (internal ${MAX_MARKS_BY_EXAM_TYPE.internal} · external ${MAX_MARKS_BY_EXAM_TYPE.external} · assignment ${MAX_MARKS_BY_EXAM_TYPE.assignment})`;
 
 export function MarksEntryForm({
   subjectId,
@@ -68,6 +71,12 @@ export function MarksEntryForm({
     setTitle(t);
     const match = existingTitles.find((x) => x.toLowerCase() === t.trim().toLowerCase());
     if (match) loadExisting(match);
+  };
+
+  const handleExamTypeChange = (t: string) => {
+    setExamType(t);
+    const preset = defaultMaxMarks(t);
+    if (preset) setMaxMarks(String(preset));
   };
 
   const maxNum = useMemo(() => Number(maxMarks), [maxMarks]);
@@ -140,7 +149,7 @@ export function MarksEntryForm({
           <select
             id="marks-type"
             value={examType}
-            onChange={(e) => setExamType(e.target.value)}
+            onChange={(e) => handleExamTypeChange(e.target.value)}
             className="w-full px-3 py-2.5 rounded-xl border border-kvsr-soft text-sm bg-white focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
           >
             {EXAM_TYPES.map((t) => (
@@ -164,6 +173,7 @@ export function MarksEntryForm({
             required
             className="w-full px-3 py-2.5 rounded-xl border border-kvsr-soft text-sm focus:outline-none focus:ring-2 focus:ring-kvsr-gold"
           />
+          <p className="text-xs text-muted-foreground mt-1.5">{JNTUA_HINT}</p>
         </div>
       </div>
 

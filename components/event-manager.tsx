@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createEvent, deleteEvent, updateEvent } from "@/lib/actions/events";
+import { createEvent, deleteEvent, planEvent, updateEvent } from "@/lib/actions/events";
+import type { PlanEventResult } from "@/lib/actions/events";
+import type { EventPlan } from "@/lib/event-planner";
 import type { EventRow } from "@/lib/db/event-queries";
 import { Modal } from "@/components/modal";
 import { EmptyState } from "@/components/empty-state";
@@ -22,13 +24,17 @@ import {
   textareaCls,
 } from "@/components/form-controls";
 import {
+  AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   Loader2,
   Pencil,
   Plus,
   Search,
   Trash2,
 } from "lucide-react";
+
+const fmtINR = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 const AUDIENCES = [
   { value: "students", label: "Students" },
@@ -104,6 +110,12 @@ export function EventManager({
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<EventRow | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [planAttendees, setPlanAttendees] = useState("");
+  const [planBudget, setPlanBudget] = useState("");
+  const [plans, setPlans] = useState<EventPlan[] | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planNote, setPlanNote] = useState<string | null>(null);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -131,6 +143,20 @@ export function EventManager({
   const canManage = (event: EventRow) =>
     role === "admin" || hodCanManage(event, ownDepartmentId, hodFacultyId);
 
+  function resetPlanner() {
+    setPlanAttendees("");
+    setPlanBudget("");
+    setPlans(null);
+    setPlanError(null);
+    setPlanNote(null);
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditing(null);
+    resetPlanner();
+  }
+
   function openCreate() {
     setEditing(null);
     setForm(
@@ -139,6 +165,7 @@ export function EventManager({
         : emptyForm
     );
     setFormError(null);
+    resetPlanner();
     setFormOpen(true);
   }
 
@@ -155,7 +182,59 @@ export function EventManager({
       departmentId: event.departmentId ?? "",
     });
     setFormError(null);
+    resetPlanner();
     setFormOpen(true);
+  }
+
+  async function generatePlans() {
+    setPlanError(null);
+    setPlanNote(null);
+    const attendees = Number(planAttendees);
+    const budget = Number(planBudget);
+    if (!form.title.trim()) {
+      setPlanError("Enter an event title first.");
+      return;
+    }
+    if (!Number.isInteger(attendees) || attendees < 10) {
+      setPlanError("Enter the expected attendees (at least 10).");
+      return;
+    }
+    if (!Number.isInteger(budget) || budget < 1000) {
+      setPlanError("Enter a total budget of at least ₹1,000.");
+      return;
+    }
+    setPlanBusy(true);
+    try {
+      const res: PlanEventResult = await planEvent({
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        attendees,
+        budget,
+      });
+      if (res.ok) {
+        setPlans(res.plans);
+      } else {
+        setPlanError(res.error);
+      }
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
+  function applyPlan(plan: EventPlan) {
+    const attendees = Number(planAttendees);
+    const summary = [
+      `${plan.name} plan: ${fmtINR(plan.total)} total`,
+      `${fmtINR(plan.perHead)} per head for ${attendees} attendees`,
+      plan.items.map((i) => `${i.label} ${fmtINR(i.amount)}`).join(", "),
+    ].join(" · ");
+    setForm((f) => ({
+      ...f,
+      description: f.description.trim()
+        ? `${f.description.trim()}\n\n${summary}`
+        : summary,
+    }));
+    setPlanNote("Plan appended to the description.");
   }
 
   async function submitForm(e: React.FormEvent) {
@@ -304,7 +383,7 @@ export function EventManager({
 
       <Modal
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={closeForm}
         title={editing ? "Edit event" : "New event"}
         description={
           editing
@@ -433,14 +512,131 @@ export function EventManager({
             </div>
           )}
 
+          <div className="rounded-xl border border-kvsr-soft bg-kvsr-navy/[0.02] p-4 space-y-3">
+            <div>
+              <p className={labelCls}>Budget planner</p>
+              <p className="text-xs text-muted-foreground">
+                Estimate costs for the expected headcount, then append a plan to
+                the description.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Attendees" htmlFor="event-attendees" hint="At least 10.">
+                <input
+                  id="event-attendees"
+                  type="number"
+                  min={10}
+                  max={5000}
+                  inputMode="numeric"
+                  value={planAttendees}
+                  onChange={(e) => setPlanAttendees(e.target.value)}
+                  placeholder="60"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Budget (₹)" htmlFor="event-budget" hint="Minimum ₹1,000.">
+                <input
+                  id="event-budget"
+                  type="number"
+                  min={1000}
+                  max={10000000}
+                  inputMode="numeric"
+                  value={planBudget}
+                  onChange={(e) => setPlanBudget(e.target.value)}
+                  placeholder="20000"
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            {planError && <StatusMessage kind="error" text={planError} />}
+            {planNote && <StatusMessage kind="success" text={planNote} />}
+            <button
+              type="button"
+              onClick={generatePlans}
+              disabled={planBusy}
+              className={btnSecondaryCls}
+            >
+              {planBusy ? (
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+              ) : null}
+              Generate 2 plans
+            </button>
+
+            {plans && plans.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                {plans.map((plan) => (
+                  <div
+                    key={plan.name}
+                    className="rounded-xl border border-kvsr-soft bg-white p-4 space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-kvsr-ink">{plan.name}</h3>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold whitespace-nowrap ${
+                          plan.fitsBudget
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {plan.fitsBudget ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        ) : (
+                          <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+                        )}
+                        {plan.fitsBudget ? "Fits budget" : "Over budget"}
+                      </span>
+                    </div>
+                    <ul className="divide-y divide-kvsr-soft text-sm">
+                      {plan.items.map((item) => (
+                        <li key={item.label} className="flex justify-between gap-3 py-1.5">
+                          <span className="text-kvsr-ink">
+                            {item.label}
+                            {item.note && (
+                              <span className="block text-xs text-muted-foreground">
+                                {item.note}
+                              </span>
+                            )}
+                          </span>
+                          <span className="font-medium text-kvsr-ink whitespace-nowrap">
+                            {fmtINR(item.amount)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="text-sm border-t border-kvsr-soft pt-2 space-y-1">
+                      <p className="flex justify-between font-semibold text-kvsr-ink">
+                        <span>Total</span>
+                        <span>{fmtINR(plan.total)}</span>
+                      </p>
+                      <p className="flex justify-between text-muted-foreground">
+                        <span>Per head</span>
+                        <span>{fmtINR(plan.perHead)}</span>
+                      </p>
+                    </div>
+                    {plan.notes.length > 0 && (
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
+                        {plan.notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => applyPlan(plan)}
+                      className={`${btnSecondaryCls} w-full`}
+                    >
+                      Use this plan
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {formError && <StatusMessage kind="error" text={formError} />}
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setFormOpen(false)}
-              className={btnSecondaryCls}
-            >
+            <button type="button" onClick={closeForm} className={btnSecondaryCls}>
               Cancel
             </button>
             <button type="submit" disabled={busy} className={btnPrimaryCls}>

@@ -6,7 +6,6 @@ const LINKS: { href: string; label: string }[] = [
   { href: "/admin/setup/students", label: "Students" },
   { href: "/admin/setup/sections", label: "Sections" },
   { href: "/admin/setup/subjects", label: "Subjects" },
-  { href: "/admin/setup/timetable", label: "Timetable" },
   { href: "/admin/setup/academic-years", label: "Academic Years" },
 ];
 

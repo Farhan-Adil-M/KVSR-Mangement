@@ -5,7 +5,7 @@ import { Send } from "lucide-react";
 import { createNotification } from "@/lib/actions/admin";
 
 export function NotificationComposer() {
-  const [target, setTarget] = useState<"faculty" | "student">("student");
+  const [target, setTarget] = useState<"faculty" | "student" | "both">("student");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -38,19 +38,25 @@ export function NotificationComposer() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-2 p-1 bg-kvsr-navy/[0.04] rounded-xl">
-        {(["student", "faculty"] as const).map((r) => (
+        {(
+          [
+            { value: "student", label: "To all students" },
+            { value: "faculty", label: "To all faculty" },
+            { value: "both", label: "Both (faculty + students)" },
+          ] as const
+        ).map((r) => (
           <button
-            key={r}
+            key={r.value}
             type="button"
-            onClick={() => setTarget(r)}
-            aria-pressed={target === r}
-            className={`py-2 rounded-lg text-sm font-medium capitalize transition-all ${
-              target === r
+            onClick={() => setTarget(r.value)}
+            aria-pressed={target === r.value}
+            className={`py-2.5 px-2 min-h-[44px] rounded-lg text-sm font-medium transition-all ${
+              target === r.value
                 ? "bg-white text-kvsr-ink shadow-sm"
                 : "text-muted-foreground hover:text-kvsr-ink"
-            }`}
+            } ${r.value === "both" ? "col-span-2" : ""}`}
           >
-            To all {r}s
+            {r.label}
           </button>
         ))}
       </div>

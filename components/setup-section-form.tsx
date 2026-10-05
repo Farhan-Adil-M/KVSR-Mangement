@@ -120,7 +120,15 @@ export function SetupSectionForm({ tree, faculty }: SetupSectionFormProps) {
             ))}
           </select>
         </Field>
-        <Field label="Study year" htmlFor="section-year">
+        <Field
+          label="Study year"
+          htmlFor="section-year"
+          hint={
+            form.programId !== "" && years.length === 0
+              ? "No study years for this program yet — add one above."
+              : undefined
+          }
+        >
           <select
             id="section-year"
             required

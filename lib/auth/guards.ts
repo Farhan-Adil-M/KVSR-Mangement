@@ -10,6 +10,7 @@ import {
   students,
   faculty,
   programs,
+  sectionCrs,
 } from "@/lib/db/schema";
 import { and, eq, asc } from "drizzle-orm";
 import { getSession, type SessionUser } from "./session";
@@ -219,4 +220,22 @@ export async function getStudentContext(
     .limit(1);
 
   return row ?? null;
+}
+
+/**
+ * Backend authorization check: is this student a class representative (CR)
+ * of the given section?
+ */
+export async function isStudentCR(
+  studentId: string,
+  sectionId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: sectionCrs.id })
+    .from(sectionCrs)
+    .where(
+      and(eq(sectionCrs.studentId, studentId), eq(sectionCrs.sectionId, sectionId))
+    )
+    .limit(1);
+  return !!row;
 }

@@ -2,9 +2,10 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { AttendanceMarking } from "@/components/attendance-marking";
 import { SelfCheckinControls } from "@/components/self-checkin-controls";
+import Link from "next/link";
 import { getFacultyDaySlots } from "@/lib/db/portal-queries";
 import { requireFaculty } from "@/lib/auth/guards";
-import { getAppConfig } from "@/lib/app-config";
+import { getCachedAppConfig } from "@/lib/db/cached-queries";
 import {
   getStudentsBySection,
   getAttendanceSessionForSlot,
@@ -14,7 +15,7 @@ import { ClipboardCheck } from "lucide-react";
 import { getCollegeNow } from "@/lib/utils";
 
 export async function generateMetadata() {
-  const config = await getAppConfig();
+  const config = await getCachedAppConfig();
   return {
     title: `Attendance | ${config.institutionShortName} Management`,
   };
@@ -26,11 +27,12 @@ interface PageProps {
 }
 
 export default async function FacultyAttendancePage({ searchParams }: PageProps) {
-  const session = await requireFaculty();
+  // Auth is cookie-only; the (non-sensitive) config read runs alongside it
+  // instead of paying a separate round trip to the distant DB region.
+  const [session, config] = await Promise.all([requireFaculty(), getCachedAppConfig()]);
 
   const collegeNow = getCollegeNow();
   const today = collegeNow.dayName;
-  const config = await getAppConfig();
   const day =
     searchParams.day && config.teachingDays.includes(searchParams.day)
       ? searchParams.day
@@ -90,21 +92,22 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Day
           </p>
-          <div className="flex flex-wrap gap-2">
-            {config.teachingDays.map((d) => (
-              <a
-                key={d}
-                href={`/faculty/attendance?day=${d}`}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  d === day
-                    ? "bg-kvsr-navy text-white shadow-md"
-                    : "bg-kvsr-navy/[0.03] text-kvsr-ink border border-kvsr-soft hover:border-kvsr-navy/30"
-                }`}
-              >
-                {d.slice(0, 3)}
-              </a>
-            ))}
-          </div>
+      <div className="flex flex-wrap gap-2">
+        {config.teachingDays.map((d) => (
+          <Link
+            key={d}
+            href={`/faculty/attendance?day=${d}`}
+            aria-current={d === day ? "page" : undefined}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              d === day
+                ? "bg-kvsr-navy text-white shadow-md"
+                : "bg-kvsr-navy/[0.03] text-kvsr-ink border border-kvsr-soft hover:border-kvsr-navy/30"
+            }`}
+          >
+            {d.slice(0, 3)}
+          </Link>
+        ))}
+      </div>
         </div>
 
         {/* Slot picker — own slots only */}
@@ -117,9 +120,10 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
         ) : (
           <div className="flex flex-wrap gap-2 mb-6">
             {slots.map((slot) => (
-              <a
+              <Link
                 key={slot.id}
                 href={`/faculty/attendance?day=${day}&slot=${slot.id}`}
+                aria-current={slot.id === selectedSlotId ? "page" : undefined}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
                   slot.id === selectedSlotId
                     ? "bg-kvsr-cta text-white border-kvsr-cta"
@@ -131,7 +135,7 @@ export default async function FacultyAttendancePage({ searchParams }: PageProps)
                 P{slot.periodNumber} · {slot.subject.slice(0, 20)}
                 {slot.subject.length > 20 ? "…" : ""} · {slot.year}-{slot.section}
                 {slot.sessionId ? " ✓" : ""}
-              </a>
+              </Link>
             ))}
           </div>
         )}

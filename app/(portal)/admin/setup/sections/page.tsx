@@ -1,11 +1,12 @@
 import { PageHeader } from "@/components/page-header";
 import { SetupSubNav } from "@/components/setup-subnav";
 import { SetupSectionForm } from "@/components/setup-section-form";
+import { SetupStudyYearsCard } from "@/components/setup-study-years-card";
 import { EmptyState } from "@/components/empty-state";
 import { requireAdmin } from "@/lib/auth/guards";
 import { getAppConfig } from "@/lib/app-config";
 import { getEnrollmentPickerTree } from "@/lib/db/enrollment-queries";
-import { getFacultyList, getSectionsFull } from "@/lib/db/queries";
+import { getFacultyList, getSectionsFull, getStudyYearsAdmin } from "@/lib/db/queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen } from "lucide-react";
 
@@ -19,10 +20,11 @@ export async function generateMetadata() {
 export default async function SetupSectionsPage() {
   await requireAdmin();
 
-  const [tree, facultyRows, sections] = await Promise.all([
+  const [tree, facultyRows, sections, studyYearPrograms] = await Promise.all([
     getEnrollmentPickerTree(null),
     getFacultyList(),
     getSectionsFull(),
+    getStudyYearsAdmin(),
   ]);
 
   return (
@@ -39,27 +41,42 @@ export default async function SetupSectionsPage() {
         />
         <SetupSubNav current="/admin/setup/sections" />
 
-        <Card className="border border-kvsr-soft bg-white shadow-sm mb-6">
-          <CardHeader className="px-6 pt-6 pb-4">
-            <CardTitle className="text-lg text-kvsr-navy">New section</CardTitle>
-            <CardDescription>
-              Each study year can have one section per name (e.g. one A per year).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            {tree.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Create departments, programs and study years first — see the
-                Departments &amp; Programs card in Settings.
-              </p>
-            ) : (
-              <SetupSectionForm
-                tree={tree}
-                faculty={facultyRows.map((f) => ({ id: f.id, fullName: f.fullName ?? "" }))}
-              />
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+          {/* Study years first: a program without years has no section targets. */}
+          <Card className="border border-kvsr-soft bg-white shadow-sm">
+            <CardHeader className="px-6 pt-6 pb-4">
+              <CardTitle className="text-lg text-kvsr-navy">Study years</CardTitle>
+              <CardDescription>
+                Programs need study years (P1, P2, …) before sections can be created.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              <SetupStudyYearsCard programs={studyYearPrograms} />
+            </CardContent>
+          </Card>
+
+          <Card className="border border-kvsr-soft bg-white shadow-sm">
+            <CardHeader className="px-6 pt-6 pb-4">
+              <CardTitle className="text-lg text-kvsr-navy">New section</CardTitle>
+              <CardDescription>
+                Each study year can have one section per name (e.g. one A per year).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              {tree.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Create departments, programs and study years first — see the
+                  Departments &amp; Programs card in Settings.
+                </p>
+              ) : (
+                <SetupSectionForm
+                  tree={tree}
+                  faculty={facultyRows.map((f) => ({ id: f.id, fullName: f.fullName ?? "" }))}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="rounded-2xl bg-white border border-kvsr-soft shadow-sm overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-5 py-4 bg-kvsr-navy/[0.03] border-b border-kvsr-soft">

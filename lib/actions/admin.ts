@@ -20,7 +20,7 @@ import { getAppConfig } from "@/lib/app-config";
 
 const createNotificationSchema = z
   .object({
-    targetRole: z.enum(["admin", "faculty", "student"]).optional().nullable(),
+    targetRole: z.enum(["admin", "faculty", "student", "both"]).optional().nullable(),
     targetFacultyId: z.string().uuid().optional().nullable(),
     targetStudentId: z.string().uuid().optional().nullable(),
     departmentId: z.string().uuid().optional().nullable(),
@@ -46,14 +46,27 @@ export async function createNotification(input: unknown) {
     parsed.data;
 
   try {
-    await db.insert(notifications).values({
-      targetRole: targetRole ?? null,
-      targetFacultyId: targetFacultyId ?? null,
-      targetStudentId: targetStudentId ?? null,
-      departmentId: departmentId ?? null,
-      title,
-      body,
-    });
+    if (targetRole === "both") {
+      // "both" inserts two rows (faculty + student) sharing title/body/department,
+      // mirroring createDepartmentNotification.
+      await db.insert(notifications).values(
+        (["faculty", "student"] as const).map((role) => ({
+          targetRole: role,
+          departmentId: departmentId ?? null,
+          title,
+          body,
+        }))
+      );
+    } else {
+      await db.insert(notifications).values({
+        targetRole: targetRole ?? null,
+        targetFacultyId: targetFacultyId ?? null,
+        targetStudentId: targetStudentId ?? null,
+        departmentId: departmentId ?? null,
+        title,
+        body,
+      });
+    }
     revalidatePath("/admin/notifications");
     revalidatePath("/faculty/notifications");
     revalidatePath("/student/notifications");

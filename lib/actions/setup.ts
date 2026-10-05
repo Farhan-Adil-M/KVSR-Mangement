@@ -7,6 +7,7 @@ import {
   academicYears,
   faculty,
   sections,
+  studyYears,
   subjects,
   timetableSlots,
 } from "@/lib/db/schema";
@@ -198,7 +199,7 @@ const createTimetableSlotSchema = z.object({
 });
 
 function revalidateSlotPaths() {
-  revalidatePath("/admin/setup/timetable");
+  revalidatePath("/admin/timetable");
   revalidatePath("/faculty/timetable");
   revalidatePath("/student/timetable");
   revalidatePath("/faculty/attendance");
@@ -409,5 +410,48 @@ export async function setCurrentAcademicYear(
   } catch (error) {
     console.error("Failed to set current academic year:", error);
     return { success: false, error: "Failed to set current academic year." };
+  }
+}
+
+/* ---------------- Study years ---------------- */
+
+const createStudyYearSchema = z.object({
+  programId: z.string().uuid(),
+  yearNumber: z.number().int().min(1).max(10),
+  label: z.string().min(1).max(40),
+});
+
+export async function createStudyYear(
+  input: unknown
+): Promise<SetupActionResult> {
+  const actor = await requireAdminActor();
+  if (!actor.ok) return { success: false, error: actor.error };
+
+  const parsed = createStudyYearSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { success: false, error: issue?.message ?? "Invalid study year payload." };
+  }
+  const { programId, yearNumber, label } = parsed.data;
+
+  try {
+    await db.insert(studyYears).values({
+      programId,
+      yearNumber,
+      label: label.trim(),
+    });
+    revalidatePath("/admin/setup/study-years");
+    revalidatePath("/admin/setup/sections");
+    revalidatePath("/admin/timetable");
+    return { success: true };
+  } catch (error) {
+    if (isUniqueViolation(error, "unique_program_study_year")) {
+      return {
+        success: false,
+        error: "That year number already exists for this program.",
+      };
+    }
+    console.error("Failed to create study year:", error);
+    return { success: false, error: "Failed to create study year." };
   }
 }

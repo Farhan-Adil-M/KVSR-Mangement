@@ -1,4 +1,4 @@
-import { DashboardHeader } from "@/components/dashboard-header";
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { MarksEntryForm } from "@/components/marks-entry-form";
 import { getFacultyAssignments, requireFaculty, getCurrentAcademicYearId } from "@/lib/auth/guards";
@@ -6,9 +6,15 @@ import { getStudentsBySection } from "@/lib/db/queries";
 import { db } from "@/lib/db";
 import { marks } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { getAppConfig } from "@/lib/app-config";
 import { Award } from "lucide-react";
 
-export const metadata = { title: "Marks Entry | KVSR Management" };
+export async function generateMetadata() {
+  const config = await getAppConfig();
+  return {
+    title: `Marks Entry | ${config.institutionShortName} Management`,
+  };
+}
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -35,8 +41,12 @@ export default async function FacultyMarksPage({ searchParams }: PageProps) {
   const existingMarks: Record<string, Record<string, { obtained: string; max: string; examType: string }>> = {};
 
   if (selected) {
-    students = await getStudentsBySection(selected.sectionId);
-    const yearId = await getCurrentAcademicYearId();
+    // Roster and current-year id are independent reads — one round trip.
+    const [roster, yearId] = await Promise.all([
+      getStudentsBySection(selected.sectionId),
+      getCurrentAcademicYearId(),
+    ]);
+    students = roster;
     if (students.length > 0 && yearId) {
       const rows = await db
         .select({
@@ -71,9 +81,13 @@ export default async function FacultyMarksPage({ searchParams }: PageProps) {
   return (
     <div className="p-6 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader
+        <PageHeader
           title="Marks Entry"
           subtitle="Record test marks for your assigned classes"
+          breadcrumbs={[
+            { label: "Faculty", href: "/faculty/dashboard" },
+            { label: "Marks Entry" },
+          ]}
         />
 
         <div className="p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm mb-6">

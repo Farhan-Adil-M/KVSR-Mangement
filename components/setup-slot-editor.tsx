@@ -48,6 +48,21 @@ interface EditorPeriod {
   isBreak: boolean | null;
 }
 
+/**
+ * One renderable row of the active day. Consecutive lab slots on the same
+ * subject collapse into a single row starting at the run's first period —
+ * `runLength`/`runEnd` describe the covered span (the underlying slots stay
+ * separate rows in the DB; edit/delete always target the first slot).
+ */
+interface DayRow {
+  period: EditorPeriod;
+  slot: EditorSlot | null;
+  runLength?: number;
+  runEnd?: EditorPeriod;
+  /** Faculty shown for the whole run; "Multiple faculty" when they differ. */
+  runFacultyLabel?: string | null;
+}
+
 interface SetupSlotEditorProps {
   basePath: string;
   sections: { id: string; label: string }[];
@@ -108,11 +123,63 @@ export function SetupSlotEditor({
     () => slots.filter((s) => s.dayOfWeek === activeDay),
     [slots, activeDay]
   );
-  const slotForPeriod = (periodNumber: number) =>
-    daySlots.find((s) => s.periodNumber === periodNumber);
+
+  /**
+   * Merge consecutive lab periods with the same subject into one row
+   * (e.g. "AI Lab · P5–P7"). Periods must be numerically adjacent, so a
+   * break between two labs keeps them separate. Non-lab slots never merge.
+   */
+  const dayRows = useMemo(() => {
+    const byPeriod = new Map(daySlots.map((s) => [s.periodNumber, s]));
+    const rows: DayRow[] = [];
+    let i = 0;
+    while (i < teachingPeriods.length) {
+      const period = teachingPeriods[i];
+      const slot = byPeriod.get(period.periodNumber) ?? null;
+      if (slot && slot.isLab) {
+        let count = 1;
+        while (
+          i + count < teachingPeriods.length &&
+          teachingPeriods[i + count].periodNumber === period.periodNumber + count &&
+          byPeriod.get(teachingPeriods[i + count].periodNumber)?.subjectId === slot.subjectId &&
+          byPeriod.get(teachingPeriods[i + count].periodNumber)?.isLab === true
+        ) {
+          count++;
+        }
+        if (count > 1) {
+          const faculties = new Set<string | null>();
+          for (let k = 0; k < count; k++) {
+            faculties.add(byPeriod.get(teachingPeriods[i + k].periodNumber)?.faculty ?? null);
+          }
+          rows.push({
+            period,
+            slot,
+            runLength: count,
+            runEnd: teachingPeriods[i + count - 1],
+            runFacultyLabel:
+              faculties.size > 1 ? "Multiple faculty" : (slot.faculty ?? null),
+          });
+          i += count;
+          continue;
+        }
+      }
+      rows.push({ period, slot });
+      i++;
+    }
+    return rows;
+  }, [daySlots, teachingPeriods]);
+
+  /** The merged run (if any) a slot being edited/deleted belongs to. */
+  const runForSlot = (slotId: string) =>
+    dayRows.find((r) => r.runLength != null && r.slot?.id === slotId);
 
   const dayOptions =
     days.includes(form.dayOfWeek) ? days : [form.dayOfWeek, ...days];
+
+  const editingRun =
+    editingSlot && editingSlot.dayOfWeek === activeDay
+      ? runForSlot(editingSlot.id)
+      : undefined;
 
   const timeLabel = (p: EditorPeriod) => {
     const trim = (t: string) => t.slice(0, 5);
@@ -269,20 +336,32 @@ export function SetupSlotEditor({
         </p>
       </div>
 
-      {/* Period rows */}
+      {/* Period rows (consecutive same-subject labs render as one merged block) */}
       <div className="space-y-3">
-        {teachingPeriods.map((period) => {
-          const slot = slotForPeriod(period.periodNumber);
+        {dayRows.map((row) => {
+          const { period, slot } = row;
+          const isRun = row.runLength != null && row.runLength > 1;
+          const periodLabel = isRun
+            ? `P${period.periodNumber}–P${row.runEnd!.periodNumber}`
+            : `P${period.periodNumber}`;
+          const timeText = isRun
+            ? `${period.startTime.slice(0, 5)} – ${row.runEnd!.endTime.slice(0, 5)}`
+            : timeLabel(period);
           return (
             <div
               key={period.id}
               className="grid grid-cols-[76px_1fr] sm:grid-cols-[110px_1fr] gap-3"
             >
               <div className="flex flex-col justify-center p-2.5 rounded-xl bg-kvsr-navy text-white text-center">
-                <span className="text-sm font-bold">P{period.periodNumber}</span>
+                <span className="text-sm font-bold">{periodLabel}</span>
                 <span className="text-[10px] sm:text-xs text-white/70 mt-0.5">
-                  {timeLabel(period)}
+                  {timeText}
                 </span>
+                {isRun && (
+                  <span className="text-[10px] sm:text-xs text-white/70 mt-0.5">
+                    {row.runLength} periods
+                  </span>
+                )}
               </div>
 
               {slot ? (
@@ -302,12 +381,17 @@ export function SetupSlotEditor({
                           Lab
                         </span>
                       )}
+                      {isRun && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-kvsr-navy/[0.06] text-kvsr-navy">
+                          {periodLabel} · {row.runLength} periods
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-3 mt-1.5 text-sm text-muted-foreground">
-                      {slot.faculty ? (
+                      {(isRun ? row.runFacultyLabel : slot.faculty) ? (
                         <span className="flex items-center gap-1.5">
                           <User className="w-4 h-4 text-kvsr-cta" aria-hidden="true" />
-                          {slot.faculty}
+                          {isRun ? row.runFacultyLabel : slot.faculty}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5">
@@ -321,7 +405,11 @@ export function SetupSlotEditor({
                     <button
                       type="button"
                       onClick={() => openEdit(slot)}
-                      aria-label={`Edit ${slot.subject} slot`}
+                      aria-label={
+                        isRun
+                          ? `Edit ${slot.subject} lab block, periods ${period.periodNumber} to ${row.runEnd!.periodNumber}`
+                          : `Edit ${slot.subject} slot`
+                      }
                       className={iconBtnCls}
                     >
                       <Pencil className="w-4 h-4" aria-hidden="true" />
@@ -332,7 +420,11 @@ export function SetupSlotEditor({
                         setDeleteTarget(slot);
                         setDeleteError(null);
                       }}
-                      aria-label={`Delete ${slot.subject} slot`}
+                      aria-label={
+                        isRun
+                          ? `Delete ${slot.subject} slot for period ${period.periodNumber} of the lab block`
+                          : `Delete ${slot.subject} slot`
+                      }
                       className={`${iconBtnCls} hover:text-destructive hover:border-destructive/40`}
                     >
                       <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -372,6 +464,14 @@ export function SetupSlotEditor({
         }
       >
         <form onSubmit={submit} className="space-y-4">
+          {editingRun && (
+            <p className="text-xs text-muted-foreground bg-kvsr-navy/[0.03] border border-kvsr-soft rounded-xl px-3 py-2.5">
+              Part of a {editingRun.runLength}-period lab block (
+              {editingRun.slot?.subject} · P{editingRun.period.periodNumber}–P
+              {editingRun.runEnd!.periodNumber}). Delete this period only, or
+              delete each period to remove the block.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Day" htmlFor="slot-day">
               <select
@@ -496,14 +596,20 @@ export function SetupSlotEditor({
         title="Delete slot"
         description="This cannot be undone."
       >
-        {deleteTarget && (
-          <div className="space-y-4">
-            <p className="text-sm text-kvsr-ink">
-              Delete the <span className="font-semibold">{deleteTarget.subject}</span>{" "}
-              slot on {deleteTarget.dayOfWeek}, period {deleteTarget.periodNumber}?
-              Attendance already taken for this slot is also removed.
-            </p>
-            {deleteError && <StatusMessage kind="error" text={deleteError} />}
+          {deleteTarget && (
+            <div className="space-y-4">
+              <p className="text-sm text-kvsr-ink">
+                Delete the <span className="font-semibold">{deleteTarget.subject}</span>{" "}
+                slot on {deleteTarget.dayOfWeek}, period {deleteTarget.periodNumber}?
+                Attendance already taken for this slot is also removed.
+              </p>
+              {deleteTarget.dayOfWeek === activeDay && runForSlot(deleteTarget.id) && (
+                <p className="text-xs text-muted-foreground bg-kvsr-navy/[0.03] border border-kvsr-soft rounded-xl px-3 py-2.5">
+                  This period is part of a lab block — deleting it removes only
+                  this period; the rest of the block stays.
+                </p>
+              )}
+              {deleteError && <StatusMessage kind="error" text={deleteError} />}
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
               <button
                 type="button"
