@@ -30,7 +30,8 @@ import {
  *
  * Role notes:
  * - `hod` lives under the /faculty prefix (middleware maps hod → /faculty)
- *   and is the faculty map PLUS the HOD-only Enrollment surface (§5, §9.2).
+ *   and is the faculty map PLUS the HOD-only Enrollment and Faculty Ratings
+ *   surfaces (§5, §9.2).
  * - Plain faculty must never see HOD surfaces, so its map simply omits them.
  */
 
@@ -79,11 +80,14 @@ const HOD_NAV: NavItem[] = [
   { href: "/faculty/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/faculty/marks", label: "Marks Entry", icon: Award },
   { href: "/faculty/faculty-attendance", label: "Faculty Attendance", icon: UserCheck, mobile: true },
+  { href: "/faculty/ratings", label: "Faculty Ratings", icon: Star },
   { href: "/faculty/notifications", label: "Notifications", icon: Bell, mobile: true },
 ];
 
-/** Faculty = HOD map minus the HOD-only Enrollment surface (§9.2). */
-const FACULTY_NAV: NavItem[] = HOD_NAV.filter((item) => item.href !== "/faculty/enrollment");
+/** Faculty = HOD map minus the HOD-only surfaces (Enrollment, Faculty Ratings). */
+const FACULTY_NAV: NavItem[] = HOD_NAV.filter(
+  (item) => item.href !== "/faculty/enrollment" && item.href !== "/faculty/ratings"
+);
 
 const STUDENT_NAV: NavItem[] = [
   { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard, mobile: true },

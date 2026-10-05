@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { db, rawSql } from "@/lib/db";
-import { facultyRatings } from "@/lib/db/schema";
+import { faculty, facultyRatings } from "@/lib/db/schema";
 import { getSession } from "@/lib/auth/session";
 
 const rateFacultySchema = z.object({
@@ -206,4 +207,137 @@ export async function getFacultyRatingSummary(
   const count = Number(row?.count ?? 0);
   const average = count > 0 ? Math.round(Number(row?.average ?? 0) * 10) / 10 : 0;
   return { count, average };
+}
+
+export interface RatingCommentRow {
+  rating: number;
+  comment: string | null;
+  subjectName: string;
+  createdAt: string;
+}
+
+export interface RatingSummaryRow {
+  facultyId: string;
+  facultyName: string;
+  departmentName: string | null;
+  average: number;
+  count: number;
+  latestComments: RatingCommentRow[];
+}
+
+type RawRatingSummaryRow = {
+  facultyId: string;
+  facultyName: string;
+  departmentName: string | null;
+  average: string | number;
+  count: string | number;
+  commentRating: string | number | null;
+  comment: string | null;
+  subjectName: string | null;
+  commentCreatedAt: Date | string | null;
+};
+
+/**
+ * Rating summaries for admin (all faculty) or HOD (own department only).
+ * Faculty/student/no session → []. Anonymous: no student ids or names are
+ * ever selected.
+ */
+export async function getRatingSummaries(): Promise<RatingSummaryRow[]> {
+  const session = await getSession();
+  if (!session || (session.role !== "admin" && session.role !== "hod")) {
+    return [];
+  }
+
+  let departmentId: string | null = null;
+  if (session.role === "hod") {
+    const [me] = await db
+      .select({ departmentId: faculty.departmentId })
+      .from(faculty)
+      .where(eq(faculty.id, session.id))
+      .limit(1);
+    // Fail closed: a HOD without a department sees no ratings, not all of them.
+    departmentId = me?.departmentId ?? null;
+    if (!departmentId) return [];
+  }
+
+  const rows = (
+    departmentId
+      ? await rawSql`
+          SELECT agg.faculty_id AS "facultyId", f.full_name AS "facultyName",
+                 d.name AS "departmentName", agg.average, agg.count,
+                 c.rating AS "commentRating", c.comment, c.subject_name AS "subjectName",
+                 c.created_at AS "commentCreatedAt"
+          FROM (
+            SELECT faculty_id, ROUND(AVG(rating)::numeric, 1) AS average, COUNT(*) AS count
+            FROM faculty_ratings
+            GROUP BY faculty_id
+          ) agg
+          JOIN faculty f ON f.id = agg.faculty_id
+          LEFT JOIN departments d ON d.id = f.department_id
+          LEFT JOIN LATERAL (
+            SELECT fr.rating, fr.comment, fr.created_at, sub.name AS "subject_name"
+            FROM faculty_ratings fr
+            JOIN subjects sub ON sub.id = fr.subject_id
+            WHERE fr.faculty_id = agg.faculty_id
+              AND fr.comment IS NOT NULL
+              AND btrim(fr.comment) <> ''
+            ORDER BY fr.created_at DESC
+            LIMIT 3
+          ) c ON true
+          WHERE f.department_id = ${departmentId}
+          ORDER BY agg.average DESC, agg.count DESC, f.full_name
+        `
+      : await rawSql`
+          SELECT agg.faculty_id AS "facultyId", f.full_name AS "facultyName",
+                 d.name AS "departmentName", agg.average, agg.count,
+                 c.rating AS "commentRating", c.comment, c.subject_name AS "subjectName",
+                 c.created_at AS "commentCreatedAt"
+          FROM (
+            SELECT faculty_id, ROUND(AVG(rating)::numeric, 1) AS average, COUNT(*) AS count
+            FROM faculty_ratings
+            GROUP BY faculty_id
+          ) agg
+          JOIN faculty f ON f.id = agg.faculty_id
+          LEFT JOIN departments d ON d.id = f.department_id
+          LEFT JOIN LATERAL (
+            SELECT fr.rating, fr.comment, fr.created_at, sub.name AS "subject_name"
+            FROM faculty_ratings fr
+            JOIN subjects sub ON sub.id = fr.subject_id
+            WHERE fr.faculty_id = agg.faculty_id
+              AND fr.comment IS NOT NULL
+              AND btrim(fr.comment) <> ''
+            ORDER BY fr.created_at DESC
+            LIMIT 3
+          ) c ON true
+          ORDER BY agg.average DESC, agg.count DESC, f.full_name
+        `
+  ) as unknown as RawRatingSummaryRow[];
+
+  const byFaculty = new Map<string, RatingSummaryRow>();
+  for (const r of rows) {
+    let summary = byFaculty.get(r.facultyId);
+    if (!summary) {
+      summary = {
+        facultyId: r.facultyId,
+        facultyName: r.facultyName,
+        departmentName: r.departmentName ?? null,
+        average: Number(r.average),
+        count: Number(r.count),
+        latestComments: [],
+      };
+      byFaculty.set(r.facultyId, summary);
+    }
+    if (r.commentRating != null && r.subjectName != null) {
+      summary.latestComments.push({
+        rating: Number(r.commentRating),
+        comment: r.comment ?? null,
+        subjectName: r.subjectName,
+        createdAt:
+          r.commentCreatedAt instanceof Date
+            ? r.commentCreatedAt.toISOString()
+            : new Date(String(r.commentCreatedAt)).toISOString(),
+      });
+    }
+  }
+  return Array.from(byFaculty.values());
 }

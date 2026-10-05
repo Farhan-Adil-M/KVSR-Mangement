@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Search, Mail, Phone, Crown, Calendar, X, Users } from "lucide-react";
+import { Search, Mail, Phone, Crown, Calendar, X, Users, Star } from "lucide-react";
 
 interface Faculty {
   id: string;
@@ -13,12 +13,18 @@ interface Faculty {
   department: string | null;
 }
 
+interface FacultyRatingChip {
+  average: number;
+  count: number;
+}
+
 interface FacultyListProps {
   faculty: Faculty[];
   searchQuery: string;
+  ratings?: Record<string, FacultyRatingChip>;
 }
 
-export function FacultyList({ faculty, searchQuery }: FacultyListProps) {
+export function FacultyList({ faculty, searchQuery, ratings }: FacultyListProps) {
   const [search, setSearch] = useState(searchQuery);
 
   return (
@@ -70,62 +76,85 @@ export function FacultyList({ faculty, searchQuery }: FacultyListProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {faculty.map((member, index) => (
-            <motion.div
-              key={member.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.03 }}
-            >
-              <a
-                href={`/admin/faculty/${member.id}`}
-                className="block p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm hover:shadow-md hover:border-kvsr-navy/10 transition-all group h-full"
+          {faculty.map((member, index) => {
+            const rating = ratings?.[member.id];
+            return (
+              <motion.div
+                key={member.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.03 }}
               >
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-lg shrink-0">
-                    {member.fullName
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </div>
-                  {member.isHod && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-kvsr-gold/15 text-kvsr-cta text-xs font-semibold">
-                      <Crown className="w-3 h-3" />
-                      HOD
-                    </span>
-                  )}
-                </div>
-
-                <h3 className="font-semibold text-kvsr-ink group-hover:text-kvsr-cta transition-colors">
-                  {member.fullName}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {member.department || "Department not assigned"}
-                </p>
-
-                <div className="space-y-2 pt-4 mt-4 border-t border-kvsr-soft">
-                  {member.email && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">{member.email}</span>
+                <a
+                  href={`/admin/faculty/${member.id}`}
+                  className="block p-5 rounded-2xl bg-white border border-kvsr-soft shadow-sm hover:shadow-md hover:border-kvsr-navy/10 transition-all group h-full"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-lg shrink-0">
+                      {member.fullName
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </div>
-                  )}
-                  {member.phone && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5 shrink-0" />
-                      <span>{member.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm text-kvsr-cta font-medium pt-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    View schedule →
+                    {(rating || member.isHod) && (
+                      <div className="flex flex-col items-end gap-1.5">
+                        {rating && (
+                          <span
+                            title={`Rated ${rating.average.toFixed(1)} of 5 by ${rating.count} student${rating.count !== 1 ? "s" : ""}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-kvsr-gold/10 text-kvsr-cta text-xs font-semibold"
+                          >
+                            <Star
+                              className="w-3.5 h-3.5 text-kvsr-gold"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            />
+                            {rating.average.toFixed(1)}
+                            <span className="font-medium text-muted-foreground">
+                              ({rating.count})
+                            </span>
+                          </span>
+                        )}
+                        {member.isHod && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-kvsr-gold/15 text-kvsr-cta text-xs font-semibold">
+                            <Crown className="w-3 h-3" />
+                            HOD
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              </a>
-            </motion.div>
-          ))}
+
+                  <h3 className="font-semibold text-kvsr-ink group-hover:text-kvsr-cta transition-colors">
+                    {member.fullName}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {member.department || "Department not assigned"}
+                  </p>
+
+                  <div className="space-y-2 pt-4 mt-4 border-t border-kvsr-soft">
+                    {member.email && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{member.email}</span>
+                      </div>
+                    )}
+                    {member.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="w-3.5 h-3.5 shrink-0" />
+                        <span>{member.phone}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-sm text-kvsr-cta font-medium pt-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      View schedule →
+                    </div>
+                  </div>
+                </a>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

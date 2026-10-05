@@ -2,6 +2,7 @@ import { EnrollmentManager } from "@/components/enrollment-manager";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { requireHodOnly } from "@/lib/auth/guards";
+import { getSectionCRs } from "@/lib/actions/cr";
 import { getFacultyDepartmentId } from "@/lib/db/event-queries";
 import {
   getEnrollmentPickerTree,
@@ -65,9 +66,12 @@ export default async function FacultyEnrollmentPage({
     sectionId = first?.sectionId ?? null;
   }
 
-  const workspace = sectionId
-    ? await getEnrollmentWorkspace(departmentId, sectionId, session.id)
-    : null;
+  const [workspace, crs] = await Promise.all([
+    sectionId
+      ? getEnrollmentWorkspace(departmentId, sectionId, session.id)
+      : Promise.resolve(null),
+    sectionId ? getSectionCRs(sectionId) : Promise.resolve([]),
+  ]);
 
   const sectionLabel = row ? `${row.yearLabel}-${row.sectionName}` : null;
 
@@ -92,6 +96,7 @@ export default async function FacultyEnrollmentPage({
           sectionLabel={sectionLabel}
           enrolled={workspace?.enrolled ?? []}
           unenrolled={workspace?.unenrolled ?? []}
+          crs={crs}
         />
       </div>
     </div>

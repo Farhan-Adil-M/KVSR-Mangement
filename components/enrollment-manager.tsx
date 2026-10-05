@@ -8,6 +8,7 @@ import {
   moveStudent,
   unenrollStudents,
 } from "@/lib/actions/enrollment";
+import { removeSectionCR, setSectionCR } from "@/lib/actions/cr";
 import { hodUpdateStudentContact } from "@/lib/actions/student-contact";
 import type {
   PickerTreeRow,
@@ -18,6 +19,7 @@ import { EmptyState } from "@/components/empty-state";
 import {
   Field,
   StatusMessage,
+  btnDangerCls,
   btnPrimaryCls,
   btnSecondaryCls,
   iconBtnCls,
@@ -27,6 +29,7 @@ import {
   ArrowRightLeft,
   Building2,
   CalendarDays,
+  Crown,
   Loader2,
   Lock,
   Pencil,
@@ -38,6 +41,12 @@ import {
   Users,
 } from "lucide-react";
 
+interface CrStudent {
+  studentId: string;
+  rollNumber: string;
+  fullName: string;
+}
+
 interface EnrollmentManagerProps {
   basePath: string;
   tree: PickerTreeRow[];
@@ -48,6 +57,7 @@ interface EnrollmentManagerProps {
   sectionLabel: string | null;
   enrolled: WorkspaceStudent[];
   unenrolled: WorkspaceStudent[];
+  crs: CrStudent[];
 }
 
 interface SectionOption {
@@ -61,7 +71,7 @@ interface MoveGroup {
   options: SectionOption[];
 }
 
-type Busy = "enroll" | "unenroll" | "move" | "create" | "contact" | null;
+type Busy = "enroll" | "unenroll" | "move" | "create" | "contact" | "cr" | null;
 
 function dedupe<T>(rows: T[], key: (row: T) => string): T[] {
   const seen = new Set<string>();
@@ -117,6 +127,7 @@ export function EnrollmentManager({
   sectionLabel,
   enrolled,
   unenrolled,
+  crs,
 }: EnrollmentManagerProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -124,6 +135,9 @@ export function EnrollmentManager({
   const [checkedUnenrolled, setCheckedUnenrolled] = useState<string[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
   const [barMessage, setBarMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const [crTarget, setCrTarget] = useState<{ student: WorkspaceStudent; make: boolean } | null>(null);
+  const [crError, setCrError] = useState<string | null>(null);
 
   const [moveTarget, setMoveTarget] = useState<WorkspaceStudent | null>(null);
   const [moveSectionId, setMoveSectionId] = useState("");
@@ -141,6 +155,8 @@ export function EnrollmentManager({
     () => tree.find((r) => r.sectionId === sectionId) ?? null,
     [tree, sectionId]
   );
+
+  const crIds = useMemo(() => new Set(crs.map((c) => c.studentId)), [crs]);
 
   const departments = useMemo(
     () =>
@@ -378,6 +394,29 @@ export function EnrollmentManager({
       router.refresh();
     } else {
       setContactError(res.error);
+    }
+  }
+
+  async function doSetCr() {
+    if (!crTarget || !sectionId) return;
+    const { student, make } = crTarget;
+    setBarMessage(null);
+    setBusy("cr");
+    const res = make
+      ? await setSectionCR({ sectionId, studentId: student.id })
+      : await removeSectionCR({ sectionId, studentId: student.id });
+    setBusy(null);
+    if (res.success) {
+      setCrTarget(null);
+      setBarMessage({
+        ok: true,
+        text: make
+          ? `${student.fullName} is now a class representative.`
+          : `CR role removed from ${student.fullName}.`,
+      });
+      router.refresh();
+    } else {
+      setCrError(res.error);
     }
   }
 
@@ -629,6 +668,11 @@ export function EnrollmentManager({
                   </label>
                 )}
               </div>
+              <p className="flex items-center gap-1.5 px-4 py-2 text-xs text-kvsr-muted bg-kvsr-navy/[0.02] border-b border-kvsr-soft">
+                <Crown className="w-3.5 h-3.5 text-kvsr-gold" aria-hidden="true" />
+                Class Representatives:{" "}
+                {crs.length > 0 ? `${crs.length}/3` : "None yet"}
+              </p>
               {filteredEnrolled.length === 0 ? (
                 <p className="px-4 py-8 text-sm text-muted-foreground text-center">
                   {enrolled.length === 0
@@ -654,6 +698,42 @@ export function EnrollmentManager({
                         >
                           <Lock className="w-4 h-4" aria-hidden="true" />
                         </span>
+                      )}
+                      {crIds.has(student.id) ? (
+                        <>
+                          <span
+                            title="Class representative"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-kvsr-gold/15 text-kvsr-cta text-xs font-semibold"
+                          >
+                            <Crown className="w-3 h-3" aria-hidden="true" />
+                            CR
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCrError(null);
+                              setCrTarget({ student, make: false });
+                            }}
+                            disabled={busy !== null}
+                            aria-label={`Remove CR role from ${student.fullName}`}
+                            className={iconBtnCls}
+                          >
+                            <UserMinus className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCrError(null);
+                            setCrTarget({ student, make: true });
+                          }}
+                          disabled={busy !== null}
+                          aria-label={`Make ${student.fullName} a class representative`}
+                          className={iconBtnCls}
+                        >
+                          <Crown className="w-4 h-4" aria-hidden="true" />
+                        </button>
                       )}
                       <button
                         type="button"
@@ -804,6 +884,64 @@ export function EnrollmentManager({
               </button>
             </div>
           </form>
+        )}
+      </Modal>
+
+      {/* Class representative role */}
+      <Modal
+        open={crTarget !== null}
+        onClose={() => setCrTarget(null)}
+        title={crTarget?.make ? "Make class representative" : "Remove class representative"}
+        description={
+          crTarget?.make
+            ? `Max 3 CRs per section. ${crTarget.student.fullName} will be able to upload resources for this class.`
+            : `Remove CR role from ${crTarget?.student.fullName ?? ""}?`
+        }
+      >
+        {crTarget && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-kvsr-navy/[0.03] border border-kvsr-soft">
+              <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-sm shrink-0">
+                {crTarget.student.fullName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-kvsr-ink truncate">
+                  {crTarget.student.fullName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Roll #{crTarget.student.rollNumber}
+                </p>
+              </div>
+            </div>
+
+            {crError && <StatusMessage kind="error" text={crError} />}
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setCrTarget(null)}
+                className={btnSecondaryCls}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={doSetCr}
+                disabled={busy !== null}
+                className={crTarget.make ? btnPrimaryCls : btnDangerCls}
+              >
+                {busy === "cr" && (
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                )}
+                {crTarget.make ? "Make CR" : "Remove CR"}
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
 

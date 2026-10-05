@@ -1,6 +1,7 @@
 import { EnrollmentManager } from "@/components/enrollment-manager";
 import { PageHeader } from "@/components/page-header";
 import { requireAdmin } from "@/lib/auth/guards";
+import { getSectionCRs } from "@/lib/actions/cr";
 import {
   getEnrollmentPickerTree,
   getEnrollmentWorkspace,
@@ -40,9 +41,12 @@ export default async function AdminEnrollmentPage({
     sectionId = first?.sectionId ?? null;
   }
 
-  const workspace = sectionId
-    ? await getEnrollmentWorkspace(null, sectionId, null)
-    : null;
+  const [workspace, crs] = await Promise.all([
+    sectionId
+      ? getEnrollmentWorkspace(null, sectionId, null)
+      : Promise.resolve(null),
+    sectionId ? getSectionCRs(sectionId) : Promise.resolve([]),
+  ]);
 
   const sectionLabel = row ? `${row.yearLabel}-${row.sectionName}` : null;
 
@@ -67,6 +71,7 @@ export default async function AdminEnrollmentPage({
           sectionLabel={sectionLabel}
           enrolled={workspace?.enrolled ?? []}
           unenrolled={workspace?.unenrolled ?? []}
+          crs={crs}
         />
       </div>
     </div>

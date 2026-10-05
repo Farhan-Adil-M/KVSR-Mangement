@@ -2,12 +2,13 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { getFacultyList, getFacultySchedule, getPeriods } from "@/lib/db/queries";
 import { getFacultyAssignments, requireAdmin } from "@/lib/auth/guards";
+import { getFacultyRatingSummary } from "@/lib/actions/ratings";
 import { getAppConfig } from "@/lib/app-config";
 import { AssignmentManager } from "@/components/assignment-manager";
 import { db } from "@/lib/db";
 import { subjects, sections, studyYears } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { Crown, Mail, Phone, Calendar, Clock } from "lucide-react";
+import { Crown, Mail, Phone, Calendar, Clock, Star } from "lucide-react";
 
 export async function generateMetadata() {
   const config = await getAppConfig();
@@ -32,7 +33,7 @@ export default async function FacultyDetailPage({
     notFound();
   }
 
-  const [schedule, assignments, subjectRows, sectionRows, periods, config] =
+  const [schedule, assignments, subjectRows, sectionRows, periods, rating, config] =
     await Promise.all([
       getFacultySchedule(member.id),
       getFacultyAssignments(member.id),
@@ -50,6 +51,7 @@ export default async function FacultyDetailPage({
         .innerJoin(studyYears, eq(sections.studyYearId, studyYears.id))
         .orderBy(asc(studyYears.yearNumber), asc(sections.name)),
       getPeriods(),
+      getFacultyRatingSummary(member.id),
       getAppConfig(),
     ]);
 
@@ -94,7 +96,7 @@ export default async function FacultyDetailPage({
         />
 
         {/* Profile summary */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           <div className="rounded-2xl border border-kvsr-soft bg-white shadow-sm p-5 lg:col-span-2">
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-kvsr-navy/5 text-kvsr-navy font-semibold text-xl shrink-0">
@@ -145,6 +147,22 @@ export default async function FacultyDetailPage({
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
               Periods per week
+            </p>
+          </div>
+          <div className="rounded-2xl border border-kvsr-soft bg-white shadow-sm p-5 flex flex-col justify-center">
+            <p className="text-3xl font-bold text-kvsr-navy">
+              {rating.count > 0 ? rating.average.toFixed(1) : "—"}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+              <Star
+                className="w-4 h-4 text-kvsr-gold"
+                fill="currentColor"
+                aria-hidden="true"
+              />
+              <span className="sr-only">Student rating — </span>
+              {rating.count > 0
+                ? `from ${rating.count} student rating${rating.count !== 1 ? "s" : ""}`
+                : "No ratings yet"}
             </p>
           </div>
         </div>
